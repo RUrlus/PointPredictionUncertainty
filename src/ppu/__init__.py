@@ -2,6 +2,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-from ppu import viz
+from ppu import generator, viz
 
-__all__ = ["viz"]
+__all__ = ["viz", "generator"]
