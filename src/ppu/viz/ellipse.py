@@ -127,6 +127,7 @@ def plot_ellipse_from_cov(
     cmap: str | None = None,
     legend_loc: str | None = None,
     zorder: int = 10,
+    return_handles: bool = False,
     **kwargs,
 ):
     """Plot ellipse for a covariance matrix.
@@ -195,6 +196,9 @@ def plot_ellipse_from_cov(
         ax, handles = _plot_filled_ellipse(pos, theta, scales, labels, ax, alpha, cmap, zorder, **kwargs)
     else:
         ax, handles = _plot_ellipse(pos, theta, scales, labels, ax, alpha, cmap, zorder, **kwargs)
+    if return_handles:
+        fig.tight_layout()
+        return ax, handles
     lh.add_legend(handles=handles, loc=legend_loc, fontsize=12)
     fig.tight_layout()
     return ax
