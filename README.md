@@ -36,6 +36,7 @@ Where `<type>` is one of:
 - `refactor`: A code change that neither fixes a bug nor adds a feature
 - `style`: Changes that do not affect the meaning of the code (white-space, formatting, ...)
 - `test`: Changes that affect tests
+- `notebook`: Addition or change to a notebook
 
 The `scope` is much more flexible but can be a portion of the code, e.g. `pipelines`, `model` or a specific feature or model variant, e.g. `random-forest`
 
