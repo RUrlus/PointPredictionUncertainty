@@ -10,6 +10,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Ellipse, Patch
 
 from ppu.viz.color import _get_color_hexes, _get_line_color
+from ppu.viz.legend import LegendHandler
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -150,9 +151,6 @@ def plot_ellipse_from_cov(
     """
     if cmap is None:
         cmap = "Blues"
-    if legend_loc is None:
-        # likely to be the best place for a single ellipse
-        legend_loc = "lower left"
 
     # quick catch for list and tuples
     if isinstance(levels, (list, tuple)):
@@ -192,15 +190,11 @@ def plot_ellipse_from_cov(
     else:
         fig = ax.get_figure()
 
+    lh = LegendHandler(ax)
     if filled or len(labels) > 4:
         ax, handles = _plot_filled_ellipse(pos, theta, scales, labels, ax, alpha, cmap, zorder, **kwargs)
     else:
         ax, handles = _plot_ellipse(pos, theta, scales, labels, ax, alpha, cmap, zorder, **kwargs)
-    og_legend = ax.get_legend()
-    if og_legend:
-        ax.legend(handles=handles, fontsize=12)
-        ax.add_artist(og_legend)
-    else:
-        ax.legend(handles=handles, loc=legend_loc, fontsize=12)
+    lh.add_legend(handles=handles, loc=legend_loc, fontsize=12)
     fig.tight_layout()
     return ax

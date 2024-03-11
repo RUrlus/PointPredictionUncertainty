@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.stats as sts
 from matplotlib.patches import Patch
 
 from ppu.viz.color import _get_color_hexes
+from ppu.viz.legend import LegendHandler
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -56,10 +56,6 @@ def plot_pdf_contours(
     """
     if cmap is None:
         cmap = "Blues"
-    if legend_loc is None:
-        # likely to be the best place for a single ellipse
-        legend_loc = "lower left"
-
     if isinstance(levels, (list, tuple)):
         levels = np.asarray(levels)
     if levels is None:
@@ -85,14 +81,9 @@ def plot_pdf_contours(
     else:
         fig = ax.get_figure()
 
+    lh = LegendHandler(ax)
     ax.contourf(x_grid, y_grid, grid_pdf, colors=colors[::-1], levels=plot_levels)
-
     handles = [Patch(facecolor=c, edgecolor=c, label=l) for c, l in zip(colors, labels)]
-    og_legend = ax.get_legend()
-    if og_legend:
-        ax.legend(handles=handles, fontsize=12)
-        ax.add_artist(og_legend)
-    else:
-        ax.legend(handles=handles, loc=legend_loc, fontsize=12)
+    lh.add_legend(handles=handles, loc=legend_loc, fontsize=12)
     fig.tight_layout()
     return ax
