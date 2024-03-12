@@ -10,6 +10,8 @@
     - https://proceedings.mlr.press/v206/gruber23a/gruber23a.pdf
 4. Retrospective Uncertainties for Deep Models using Vine Copulas
     - https://proceedings.mlr.press/v206/tagasovska23a/tagasovska23a.pdf
+5. Pitfalls of in-domain uncertainty estimation and ensembling in deep learning
+    - https://arxiv.org/abs/2002.06470
 
 ## Statistical Uncertainty
 1. MACEst: The reliable and trustworthy Model Agnostic Confidence Estimator
