@@ -14,6 +14,7 @@
     - https://arxiv.org/abs/2002.06470
 
 ## Statistical Uncertainty
+
 1. MACEst: The reliable and trustworthy Model Agnostic Confidence Estimator
     - https://arxiv.org/abs/2109.01531
 2. Synthsonic: Fast, Probabilistic modeling and Synthesis of Tabular Data
@@ -25,3 +26,12 @@
 1. Pointwise sampling uncertainties on the Precision-Recall curve:
     - https://proceedings.mlr.press/v206/urlus23a.html
     - Written by us
+
+# Packages & Repositories
+
+## Model Uncertainty
+
+1. Uncertainty Estimates of Predictions via a General Bias-Variance Decomposition
+    - https://github.com/MLO-lab/Uncertainty_Estimates_via_BVD
+2. errortools
+    - https://github.com/faab5/errortools
