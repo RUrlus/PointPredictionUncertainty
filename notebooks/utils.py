@@ -72,6 +72,7 @@ def BI_LSE(z, bound='auto', C=1000):
     
     if bound=='upper':
         LSE_of_E = LSE_LB_estimator_(z, C)
+        #LSE_of_E = LSE(np.mean(z))
     elif bound=='lower':
         avg_z = np.mean(z, axis=0)
         LSE_of_E = LSE(np.expand_dims(avg_z, axis=0))[0]
