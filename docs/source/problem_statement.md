@@ -1,5 +1,5 @@
 ---
-bibliography: docs/references.bib
+bibliography: /Users/hb70ur/PointPredictionUncertainty/docs/source/references.bib
 ---
 
 
@@ -22,7 +22,7 @@ A properly calibrated model predicts $P(y_i = C_j | X_i)$, the probability that 
 Yet a model can predict a score of 0.5 for an observation with very low uncertainty, meaning the model is very sure the probability of either class is equal.
 Existing model confidence scores are based on evaluating a hold-out set over (many) permutations of the classifier.
 Evaluating the variability of the predicted class for these points over the permutations gives a measure of uncertainty.
-Various flavours of model confidence scores exist[@mandelbaum2017,@lakshminarayanan2017,@gruber2023].
+Various flavours of model confidence scores exist[@mandelbaum2017;@lakshminarayanan2017;@gruber2023].
 
 
 However, all these methods fail in one regard: the further an observation lies from the decision boundary the higher the model confidence tends to be.
@@ -40,10 +40,11 @@ For a given observation $\mathcal{x} \in \mathcal{X}$ there will be the uncertai
 
 * $\sigma_{\mathrm{OODC}}$: scince we trained the classifier on the training set, so the training set is all the information we know about the data distribution, while the situation that the new data(test set) from the distribution looks like an outlier for the training set, so it's like the probability that the feature of the new data point is not captured by the training set.
 
-$$\begin{align}
+$$
+\begin{aligned}
 \sigma_{\text{OODC}} &= \mathbf{P}\left(x \nsim \widehat{F}_{X} \mid X, x \in \mathcal{X} \right) \\
 &= 2|0.5 - \widehat{F}_{X}(x)|
-\end{align}
+\end{aligned}
 $$
 
 For this method to work one would need to have a way to estimate the CDF ($F_{X}$) of the distribution from which $X$ was drawn.
@@ -55,7 +56,7 @@ $$
 
 When we have a learning algorithm, in real life cases, we are going to train the model on a training set, while the extant of the training set capturing the feature of the distribution has variance, and the training environments, including software parameter initialization, which leads to the variance of the point predictions by models. This is the uncertainty of the classifier generating process itself. 
 
-Given a learning algorithm and given a set of training sets and training environments, it can generate a hypothiesis class $\mathcal{H}$, where 
+Given a learning algorithm and given a set of training sets and training environments, it can generate a hypothesis class $\mathcal{H}$, where 
 
 $$
 \sigma_{\mathrm{classifier}} = var(h(x) \mid h \in \mathcal{H})
@@ -63,4 +64,5 @@ $$
 
 
 
+## References
 
