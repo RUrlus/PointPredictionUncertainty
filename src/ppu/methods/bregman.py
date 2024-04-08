@@ -5,32 +5,31 @@ Uncertainty Estimates of Predictions via a General Bias-Variance Decomposition
 Sebastian G. Gruber and Florian Buettner
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
 import random
-import seaborn as sns
-
-from matplotlib.colors import ListedColormap
-from ppu.methods.utils import BI_LSE, accuracy, stable_logit_transform, get_dataset
-from ppu.methods.mlp import MLP
 from copy import deepcopy
-from sklearn.inspection._plot.decision_boundary import _check_boundary_response_method
+
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+from matplotlib.colors import ListedColormap
 from scipy.special import expit
 from sklearn.inspection import DecisionBoundaryDisplay
+from sklearn.inspection._plot.decision_boundary import _check_boundary_response_method
 
-
+from ppu.methods.mlp import MLP
+from ppu.methods.utils import BI_LSE, get_dataset, stable_logit_transform
 
 
 def get_BI(xs, models):
-    preds = np.array([_check_boundary_response_method(m, 'auto')(xs) for m in models])
+    preds = np.array([_check_boundary_response_method(m, "auto")(xs) for m in models])
     # preds might be probabilities
     if len(preds.shape) == 3:
         logits = stable_logit_transform(preds[:,:,1])
     # or just logits
     else:
         logits = preds
-        
-    BIs = np.array([BI_LSE(zs, bound='lower') for zs in logits.T])
+
+    BIs = np.array([BI_LSE(zs, bound="lower") for zs in logits.T])
     return BIs
 
 def get_models(clf, gen, reps, n_samples=200, **kwargs):
@@ -46,7 +45,7 @@ def nn_models(gen, n_models, n_samples=500, DE=False, extra_kwargs={}, **kwargs)
     result = []
     # if we want deep ensembles, we have to fix the dataset seed to get the same dataset
     seeds = [0 for _ in range(n_models)] if DE else range(n_models)
-    
+
     for rng in seeds:
         (X_train, y_train), (X_test, y_test) = get_dataset(rng, gen, n_samples=n_samples, **extra_kwargs)
         model = MLP(**kwargs)
@@ -72,7 +71,7 @@ def BS_nn_models(gen, n_models, n_samples=500, DE=False, extra_kwargs={}, **kwar
     # bootstrapping
     result = []
     seeds = range(n_models)
-    
+
     (X_train, y_train), (X_test, y_test) = get_dataset(0, gen, n_samples=n_samples, **extra_kwargs)
     for _ in seeds:
         bs_ind = random.choices(range(n_samples), k=n_samples)
@@ -89,9 +88,9 @@ def diff_classifier(generator, n_samples, names, classifiers, models, rescale = 
     offset = 1
     rows = 2
 
-    gridspec_kw={'height_ratios': [1, 1]}
+    gridspec_kw={"height_ratios": [1, 1]}
     cbar_kws = dict(use_gridspec=False, location="bottom")
-    plt.rcParams.update({'font.size': 15})
+    plt.rcParams.update({"font.size": 15})
     figure, axs = plt.subplots(rows, len(models) + offset, gridspec_kw=gridspec_kw, figsize=(27, 6))
 
     i = 0
@@ -107,7 +106,7 @@ def diff_classifier(generator, n_samples, names, classifiers, models, rescale = 
 
     # just plot the dataset first
     cm = plt.cm.RdBu # color map parameter
-    cm_bright = ListedColormap(["#FF0000", "#0000FF"]) # color for data points 
+    cm_bright = ListedColormap(["#FF0000", "#0000FF"]) # color for data points
     ax = axs[0][i] # position of subgraph
     ax.set_title("Data") # subgraph title
     # Plot the training points
@@ -127,15 +126,15 @@ def diff_classifier(generator, n_samples, names, classifiers, models, rescale = 
         xs, ys = np.meshgrid(x, y)
         X_grid = np.c_[xs.ravel(), ys.ravel()] # All the grid points
 
-        if name == 'Neural Net':
+        if name == "Neural Net":
             response = clf.predict(X_grid)
         else: # this if else is no needed
-            response = _check_boundary_response_method(clf, 'auto')(X_grid) # the function returns the probability of points(inputs) belong to each class
+            response = _check_boundary_response_method(clf, "auto")(X_grid) # the function returns the probability of points(inputs) belong to each class
 
         if len(response.shape) == 1:
             response = expit(response)
         else:
-            response = response[:, 1] # since there's only 2 classes so 1 can represent the other(the prob sums up to 1) 
+            response = response[:, 1] # since there's only 2 classes so 1 can represent the other(the prob sums up to 1)
 
         display = DecisionBoundaryDisplay(
             xx0=xs,
@@ -157,7 +156,7 @@ def diff_classifier(generator, n_samples, names, classifiers, models, rescale = 
 
     i = 0
     ax = axs[1][i]
-    ax.axis('off') # turn off both x-axis and y-axis, including their labels and ticks
+    ax.axis("off") # turn off both x-axis and y-axis, including their labels and ticks
     i += 1
 
     # iterate over classifiers
@@ -174,7 +173,7 @@ def diff_classifier(generator, n_samples, names, classifiers, models, rescale = 
             response = (response-vmin) / (vmax-vmin)
         response = response.reshape(xs.shape)
 
-        with np.errstate(all='ignore'):
+        with np.errstate(all="ignore"):
             sns.heatmap(response, ax=ax, cbar_kws=cbar_kws).invert_yaxis()
 
         ax.set_xticks(())
