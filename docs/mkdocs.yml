@@ -1,0 +1,37 @@
+site_name: Point Prediction Uncertainty
+site_author: ING Analytics WB
+copyright: "(c) 2024"
+
+docs_dir: source
+
+theme:
+  name: material
+  features:
+    - content.tooltips
+    - navigation.footer
+
+nav:
+  - Home: problem_statement.md
+
+extra_javascript:
+  - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-AMS-MML_HTMLorMML
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+use_directory_urls: false
+
+plugins:
+  - bibtex:
+      bib_file: "references.bib"
+  - search
+  - print-site
+
+markdown_extensions:
+  - footnotes
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - attr_list
+  - md_in_html
