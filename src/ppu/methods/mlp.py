@@ -101,7 +101,10 @@ class MLP:
     def predict(self, xs):
         xs = torch.from_numpy(xs).to(dtype=torch.float32, device=self.device)
         self.model.eval()
-        return self.model(xs).squeeze(-1).detach().cpu().numpy()
+        with torch.no_grad():  # Ensures that no gradients are computed
+            logits = self.model(xs).squeeze(-1)
+            probabilities = torch.sigmoid(logits)  # Apply sigmoid to convert logits to probabilities
+            return probabilities.detach().cpu().numpy()
 
     def score(self, xs, ys):
         xs = torch.from_numpy(xs).to(dtype=torch.float32, device=self.device)
