@@ -18,24 +18,20 @@ def stable_logit_transform(probs, max_=16):
         logs = np.log(probs)
         anti_logs = np.log(np.subtract(1, probs))
         results = logs - anti_logs
-        results[results==-np.inf] = -max_
-        results[results==np.inf] = max_
-        return results
+        return np.clip(results, -max_, max_)
 
 def LSE(z):
-    """ 
-    input: reduced logits
-    """
+    """input: reduced logits"""
     #if len(x.shape) < 2:
     z = np.hstack([z, np.zeros(z.shape)])
     #x[:,1] = 0
     return logsumexp(z, axis=1)
 
 def LSE_LB_estimator_(x, C):
-    """ 
+    r""" 
     LSE lower bound estimator
     C: number of summands in the estimator - higher is better but slower
-    
+
     Computes the following formula:
     \frac{1}{2n} \\sum_{i=1}^n X_i + \\sum_{j=1}^C \\ln (1 + \frac{\frac{1}{n(n-1)} \\sum_{k \neq l} X_k X_l}{4 (n - 0.5)^2 \\pi^2}) + \\ln 2
     """
@@ -89,11 +85,10 @@ def accuracy(predictions, labels):
 
 def get_dataset(rng, gen, n_samples=200, n_test_samples=200, **kwargs):
     gen = gen(rng=rng, **kwargs)
-    dataset = (
+    return (
         gen.rvs(n_samples),
         gen.rvs(n_test_samples)
     )
-    return dataset
 
 def generate_data(n, seed, shape="circular", noise=0.5):
 
