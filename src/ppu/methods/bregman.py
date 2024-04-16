@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from matplotlib.colors import ListedColormap
-from scipy.special import expit
 from sklearn.inspection import DecisionBoundaryDisplay
 from sklearn.inspection._plot.decision_boundary import _check_boundary_response_method
 
@@ -24,10 +23,9 @@ def get_BI(xs, models):
     preds = np.array([_check_boundary_response_method(m, "auto")(xs) for m in models])
     # preds might be probabilities
     if len(preds.shape) == 3:
-        logits = stable_logit_transform(preds[:,:,1])
-    # or just logits
-    else:
-        logits = preds
+        preds = preds[:,:,1]
+
+    logits = stable_logit_transform(preds)
 
     BIs = np.array([BI_LSE(zs, bound="lower") for zs in logits.T])
     return BIs
@@ -39,18 +37,6 @@ def get_models(clf, gen, reps, n_samples=200, **kwargs):
         new_clf = deepcopy(clf)
         new_clf.fit(X_train, y_train)
         result.append(new_clf)
-    return result
-
-def nn_models(gen, n_models, n_samples=500, DE=False, extra_kwargs={}, **kwargs):
-    result = []
-    # if we want deep ensembles, we have to fix the dataset seed to get the same dataset
-    seeds = [0 for _ in range(n_models)] if DE else range(n_models)
-
-    for rng in seeds:
-        (X_train, y_train), (X_test, y_test) = get_dataset(rng, gen, n_samples=n_samples, **extra_kwargs)
-        model = MLP(**kwargs)
-        model.fit(X_train, y_train)
-        result.append(model)
     return result
 
 def BS_models(clf, gen, reps, n_samples=500, **kwargs):
@@ -66,30 +52,13 @@ def BS_models(clf, gen, reps, n_samples=500, **kwargs):
         result.append(model)
     return result
 
-def BS_nn_models(gen, n_models, n_samples=500, DE=False, extra_kwargs={}, **kwargs):
-
-    # bootstrapping
-    result = []
-    seeds = range(n_models)
-
-    (X_train, y_train), (X_test, y_test) = get_dataset(0, gen, n_samples=n_samples, **extra_kwargs)
-    for _ in seeds:
-        bs_ind = random.choices(range(n_samples), k=n_samples)
-        bs_X = X_train[bs_ind]
-        bs_y = y_train[bs_ind]
-        model = MLP(**kwargs)
-        model.fit(bs_X, bs_y)
-        result.append(model)
-    return result
-
-
 def diff_classifier(generator, n_samples, names, classifiers, models, rescale = False):
     dataset = get_dataset(1000, generator, n_samples=n_samples)
     offset = 1
     rows = 2
 
     gridspec_kw={"height_ratios": [1, 1]}
-    cbar_kws = dict(use_gridspec=False, location="bottom")
+    cbar_kws = {"use_gridspec": False, "location": "bottom"}
     plt.rcParams.update({"font.size": 15})
     figure, axs = plt.subplots(rows, len(models) + offset, gridspec_kw=gridspec_kw, figsize=(27, 6))
 
@@ -126,14 +95,9 @@ def diff_classifier(generator, n_samples, names, classifiers, models, rescale = 
         xs, ys = np.meshgrid(x, y)
         X_grid = np.c_[xs.ravel(), ys.ravel()] # All the grid points
 
-        if name == "Neural Net":
-            response = clf.predict(X_grid)
-        else: # this if else is no needed
-            response = _check_boundary_response_method(clf, "auto")(X_grid) # the function returns the probability of points(inputs) belong to each class
+        response = _check_boundary_response_method(clf, "auto")(X_grid) # the function returns the probability of points(inputs) belong to each class
 
-        if len(response.shape) == 1:
-            response = expit(response)
-        else:
+        if len(response.shape) != 1:
             response = response[:, 1] # since there's only 2 classes so 1 can represent the other(the prob sums up to 1)
 
         display = DecisionBoundaryDisplay(
@@ -160,7 +124,7 @@ def diff_classifier(generator, n_samples, names, classifiers, models, rescale = 
     i += 1
 
     # iterate over classifiers
-    for name in models.keys():
+    for name in models:
         ax = axs[1][i]
         x = np.linspace(x_min, x_max, n_ticks)
         y = np.linspace(y_min, y_max, n_ticks)
