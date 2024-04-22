@@ -11,7 +11,7 @@ Where $y_1, \cdots, y_n \in \{0, \cdots, k\} \subset \mathbb{Z}$ and $\mathbf{x}
 
 <!--$P:\mathbb{R}^d \times \{0, 1\} \to [0, 1]$ that maximises (minimises) the target metric $e$: -->
 
-Suppose we have a set of predictor which is called *Hypothesis class*. Our goal is to learn a function $h \in \mathcal{H}; h: \mathbb{R}^{d} \to \{0, \cdots, k\}$ that maximises (minimises) the target metric $e$: $\operatorname{max}_{h}\mathbb{E}[e(h(x), y)]$. A properly calibrated model predicts $P(y_i = C_j | \mathbf{x}_i)$, the probability that observation $y_i$ belongs to class $C_j$.
+Suppose we have a set of predictor which is called *Hypothesis class*. Our goal is to learn a function $h \in \mathcal{H}; h: \mathbb{R}^{d} \to \{0, \cdots, k\}$ that maximises (minimises) the target metric $e$: $\operatorname{max}_{h}\mathbb{E}[e(h(x), y)]$. A properly calibrated model predicts $s_i = P(y_i = C_j | \mathbf{x}_i)$, the probability that observation $\mathbf{x}_i$ belongs to class $C_j$.
 
 
 Yet a model can predict a score of 0.5 for an observation with very low uncertainty, meaning the model is very sure the probability of either class is equal.
@@ -33,7 +33,7 @@ To summarise, let $\mathcal{X} = \{ \mathbf{x}_{n+1}, \cdots, \mathbf{x}_{m} \}$
 For a given observation $\mathbf{x} \in \mathcal{X}$ there will be the uncertainty for the result of the classifier, which we can divided it into mainly 2 parts, the out of distribution classifier uncertainty and training uncertainty:
 
 
-* $\sigma_{\mathrm{OODC}}$: since we trained the classifier on the training set, so the training set is all the information we know about the data distribution, while the situation that the new data(test set) from the distribution looks like an outlier for the training set, so it's like the probability that the feature of the new data point is not captured by the training set.
+* $\sigma_{\mathrm{OODC}}$: since we trained the classifier on the training set, so the training set is all the information we know about the data distribution, while there are 2 possible situations may happen. The new data(in the test set) from the unknown distribution looks like an outlier for the training set, or the unknown distribution changed(covariate drift). So it's like the probability that the feature of the new data point is not captured by the training set.
 
 $$
 \begin{aligned}
@@ -99,7 +99,37 @@ $$
 
 with the *LogSumExp Function* $LSE(x_1,\cdots,x_n) = \ln\sum^n_{i=1}e^{x_i}$, the *softmax function* $sm = \nabla LSE$ and *Shannon entropy* $H$[@gruber2022uncertainty]. 
 
-### Score Variance
+
+### Beta Distribution
+For the Bregman Information, there is a problem with it. It only reflect the variance of the output probability score from the model.  For binary case, there is a threshold $t$ we add to identify the classes is not been considered, which shows below
+$$
+label_i =\mathbf{1}[s_i \geq t]
+$$
+At each point $\mathbf{x}_i$ the model will generate a probability score $s_i$, due to the randomness of sampling process there will be a distribution $\mathcal{S_i}$, where
+$$
+s_i \sim \mathcal{S_i}
+$$
+we define
+$$
+p_i = P(s_i \geq t)
+$$
+then for n models and the point $\mathbf{x_i}$, then $L = \#(label_i^{(n)}=1) \sim Binom(n, p_i)$. If we have a prior on $p_i$, which is $\lambda_i \sim Beta(\alpha, \beta)$, then the posterior
+
+$$
+\begin{align*}   
+\pi(p \mid L=m) &\propto P(L=m\mid p)\cdot\pi(p) \\
+&\propto p^m(1-p)^{n-m}p^{\alpha-1}(1-p)^{\beta-1} \\
+&=p^{m+\alpha-1}(1-p)^{n-m+\beta-1}
+\end{align*}
+$$
+
+which shows $(\lambda_i \mid L=m) \sim Beta(\alpha+m,n-m+\beta)$, then we can estimate $p_i$ by $\hat{p}_i = \mathbb{E}[\lambda_i \mid L=m]=\frac{\alpha + m}{\alpha + \beta + n}$.
+
+Then we can use
+$$
+\sigma = \min[p_i,1-p_i] = Prob(\text{label prediction change})
+$$
+to evaluate the training uncertainty.
 
 
 ## References
