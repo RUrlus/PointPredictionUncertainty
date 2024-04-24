@@ -97,7 +97,7 @@ $$
 \mathbb{E}[-\ln sm_Y(\hat{z})] = H(Q) + \mathbb{B}_{LSE}[\hat{z}] + d_{LSE}(sm^{-1}(Q),\mathbb{E}[\hat{z}])
 $$
 
-with the *LogSumExp Function* $LSE(x_1,\cdots,x_n) = \ln\sum^n_{i=1}e^{x_i}$, the *softmax function* $sm = \nabla LSE$ and *Shannon entropy* $H$[@gruber2022uncertainty]. 
+with $sm_Y(\hat{z}) = \frac{\sum^n_{i=1}e^{\hat{z}_i}\mathbf{1}[Y_i=1]}{\sum^n_{i=1}e^{\hat{z}_i}}$, the *LogSumExp Function* $LSE(x_1,\cdots,x_n) = \ln\sum^n_{i=1}e^{x_i}$, the *softmax function* $sm = \nabla LSE$ and *Shannon entropy* $H$[@gruber2022uncertainty]. 
 
 
 ### Beta Distribution
@@ -113,7 +113,7 @@ we define
 $$
 p_i = P(s_i \geq t)
 $$
-then for n models and the point $\mathbf{x_i}$, then $L = \#(label_i^{(n)}=1) \sim Binom(n, p_i)$. If we have a prior on $p_i$, which is $\lambda_i \sim Beta(\alpha, \beta)$, then the posterior
+then for n models and the point $\mathbf{x_i}$, then $L = \#(label_i^{(n)}=1) \sim Binom(n, p_i)$. As $p_i$ is unknown, we will try to estiamte it. If we have a prior on $p_i$, which is $\lambda_i \sim Beta(\alpha, \beta)$, then the posterior
 
 $$
 \begin{align*}   
