@@ -132,5 +132,27 @@ $$
 to evaluate the training uncertainty.
 
 
+## OODC -- the cause
+
+Let $\Phi \subset \mathbb{R}^{d}$ be our connected topological feature space with corresponding cumulative density function $F_{\Phi}$.
+Let $F_{\Phi}$ be strictly stationary, that is $~\forall\tau,t_{1},\ldots,t_{n}\in\mathbb{R}$ and $~\forall n\in\mathbb{N}_{++}$ we have $F_{\Phi}(\mathbf{x}_{t_{1}},\ldots,\mathbf{x}_{t_{n}}) = F_{\Phi}(\mathbf{x}_{t_{1} + \tau},\ldots,\mathbf{x}_{t_{n} + \tau})$.
+
+Let $\phi$ denote a subspace of s.t. $\{\phi_1,\ldots,\phi_k \} = \Phi$ where $\phi_i \cap \phi_j = \emptyset~\forall i, j \in \{1,\dots,k\} \mid i \neq j$.
+
+Let $\mathbf{X} \sim F_{\Phi}$ denote the set of $n$ observed samples drawn from the data generating process.
+Hence, each sample $\mathbf{x}$ is a member of a particular subspace $\phi_i$ s.t. $\mathbf{x} \in \phi_i \subset \mathbb{R}^{d}$ where $i \in \{1,\ldots,m\}$ and $m \ll n$.
+Thus the topological space $\mathcal{X}$ that contains $\mathbf{X}$ consists of $m$, where $m \leq k$, randomly selected subspaces of our feature set: $\mathcal{X} = \{\phi_1,\ldots,\phi_m\} \subseteq \Phi$.
+Which implies that $\mathcal{X}$ is not necessarily a connected subspace of $\Phi$.
+
+Let $\mathbf{x}_{n+\tau}$ denote a observation that is not part of the previously observed data but is identically distributed, i.e. $\mathbf{x}_{n+\tau} \in X_{j} \subset \mathbb{R}^{d}; \mathbf{x}_{n+\tau} \sim F_{\Phi}$ and $\{\mathbf{x}_{n+\tau}\} \cap \mathbf{X} = \emptyset$
+Let $X_{i} = \{\mathbf{x} : \forall~\mathbf{x} \in \phi_i\}$ denote the set of observations that belong the subspace $\phi_i$.
+
+TODO make formal: assumption that points located close together are related to each other and the target feature
+
+Under the above assumption, if there are no points that are located close to $\mathbf{x}_{n+\tau}$ we have no way of knowing what the classifier will do for these points.
+This makes it that there is significant uncertainty on the _correctness_ of the prediction.
+
+The aim is to develop a methodology to estimate the uncertainty over the prediction on $\mathbf{x}_{n+\tau}$ given the previously observed data $\mathbf{X}$.
+
 ## References
 
