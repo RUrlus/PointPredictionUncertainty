@@ -77,6 +77,12 @@ def BI_LSE(z, bound="auto", C=1000):
 
     return E_of_LSE - LSE_of_E
 
+def Beta_mean(lables, prior_a=0.5, prior_b=0.5):
+    m = np.count_nonzero(lables)
+    n = len(lables)
+    p = (prior_a + m) / (prior_a + prior_b + n)
+    return min(p, 1-p)
+
 def accuracy(predictions, labels):
     # array indicating which prediction is correct
     correct = np.equal(predictions, labels)
