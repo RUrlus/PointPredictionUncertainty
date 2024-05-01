@@ -18,7 +18,7 @@ from sklearn.inspection import DecisionBoundaryDisplay
 from sklearn.inspection._plot.decision_boundary import _check_boundary_response_method
 
 from ppu.methods.mlp import MLP
-from ppu.methods.utils import BI_LSE, get_dataset, stable_logit_transform
+from ppu.methods.utils import BI_LSE, get_dataset, stable_logit_transform, Beta_mean
 
 
 def get_BI(xs, models):
@@ -44,6 +44,17 @@ def get_revised_BI(xs, models):
     # BIs = np.array([BI_LSE(zs, bound="lower") / (-0.05 / (abs(b.mean() - 0.5) + 0.07) + 1) for b,zs in zip(preds.T, logits.T)])
     # BIs = np.array(softmax([10*(1 - norm.cdf(abs(b.mean() - 0.5) / b.var()))-1. for b,zs in zip(preds.T, logits.T)]))
     return BIs
+
+def get_Beta(xs, models, threshold, prior_a=0.5, prior_b=0.5):
+    preds = np.array([_check_boundary_response_method(m, "auto")(xs) for m in models])
+    # preds are probabilities
+    if len(preds.shape) == 3:
+        preds = preds[:,:,1]
+
+    labels = np.where(preds >= threshold, 1, 0)
+
+    Betas = np.array([Beta_mean(label, prior_a=0.5, prior_b=0.5) for label in labels.T])
+    return Betas
 
 def get_models(clf, gen, reps, n_samples=200, **kwargs):
     result = []
