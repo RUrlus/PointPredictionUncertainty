@@ -6,10 +6,11 @@ You will work on an innovative method to find the prediction uncertainty on indi
 
 ## Problem statement
 
-Let $S = \{(\mathbf{x}_1, y_1), \dots, (\mathbf{{x}}_n, y_n)\}$ be a set of $n$ i.i.d. (input, target) pairs that follow an unknown distribution $\mathcal{P}$.
-Where $y_1, \cdots, y_n \in \{0, \cdots, k\} \subset \mathbb{Z}$ and $\mathbf{x}_1, \cdots, \mathbf{x}_n \in \mathbb{R}^{d}; \mathbf{x}_1, \cdots, \mathbf{x}_n \sim \mathcal{P}_{\mathbf{x}}$, where $\mathcal{P}_{\mathbf{x}}$ is the marginal distribution of the $\mathbf{x}$.
+Let $S = \{(\mathbf{x}_1, y_1), \dots, (\mathbf{{x}}_n, y_n)\}$ be a set of $n$ i.i.d. (input, target) pairs that follow an unknown distribution $P$.
+Where $y_1, \cdots, y_n \in \{0, \cdots, k\} \subset \mathbb{Z}$ and $\mathbf{x}_1, \cdots, \mathbf{x}_n \in \mathbb{R}^{d}; \mathbf{x}_1, \cdots, \mathbf{x}_n \sim P_{\mathbf{x}}$, where $P_{\mathbf{x}}$ is the marginal distribution of the $\mathbf{x}$.
 
 <!--$P:\mathbb{R}^d \times \{0, 1\} \to [0, 1]$ that maximises (minimises) the target metric $e$: -->
+
 
 Suppose we have a set of predictor which is called *Hypothesis class*. Our goal is to learn a function $h \in \mathcal{H}; h: \mathbb{R}^{d} \to \{0, \cdots, k\}$ that maximises (minimises) the target metric $e$: $\operatorname{max}_{h}\mathbb{E}[e(h(x), y)]$. A properly calibrated model predicts $s_i = P(y_i = C_j | \mathbf{x}_i)$, the probability that observation $\mathbf{x}_i$ belongs to class $C_j$.
 
@@ -28,30 +29,41 @@ Many machine learning models are essentially curve fitters which can exhibit err
 This problem quickly becomes worse in high dimensional feature spaces which are often heterogeneous in density and can result in highly non-linear decision boundaries. 
 What is needed is a unified measure of uncertainty that not only incorporates the model’s uncertainty but also the statistical uncertainty inherent to having only a limited sample.
 
+Given a proper score $S:\mathcal{P} \to \mathcal{L}(\mathcal{P})$, and corresponding generalized entropy $G:\mathcal{P} \to \mathbb{R}$, where $G(P) = S(P) \cdot P$, we have the associated divergence function $d_{G,S}(P, Q) = G(Q) - S(P)\cdot Q$, where $P,Q \in \mathcal{P}$.
+
+For the given training set $S_n = \{(\mathbf{x}_1, y_1), \dots, (\mathbf{{x}}_n, y_n)\}$, we can estimate the joint probability distribution of $(\mathbf{x}, y)$, which is $\hat{P}_{S_n}(\mathbf{x}, y) = \hat{P}_n(y\mid\mathbf{x}) \cdot \hat{P}_{\mathbf{X}_n}(\mathbf{x})$, where $\mathbf{X}_n = \{ \mathbf{x}_1, \cdots, \mathbf{x}_n \}$. Where the true joint distribution can also writen as $P(\mathbf{x}, y) = P(y\mid\mathbf{x}) \cdot P(\mathbf{x})$.
 
 To summarise, let $\mathcal{X} = \{ \mathbf{x}_{n+1}, \cdots, \mathbf{x}_{m} \}$, where $\mathbf{x}_{n+1}, \cdots, \mathbf{x}_{m} \sim \mathcal{P}_{\mathbf{x}}$ and $\mathcal{X} \cap X = \emptyset$, be a set of inputs for which we want to estimate the corresponding target.
-For a given observation $\mathbf{x} \in \mathcal{X}$ there will be the uncertainty for the result of the classifier, which we can divided it into mainly 2 parts, the out of distribution classifier uncertainty and training uncertainty:
-
-
-* $\sigma_{\mathrm{OODC}}$: since we trained the classifier on the training set, so the training set is all the information we know about the data distribution, while there are 2 possible situations may happen. The new data(in the test set) from the unknown distribution looks like an outlier for the training set, or the unknown distribution changed(covariate drift). So it's like the probability that the feature of the new data point is not captured by the training set.
+For a given observation $\mathbf{x} \in \mathcal{X}$, given a proper score $S$, we have the corresponding generalized entropy $G$, we define the convex conjugate $G^*(P^*) = \sup_{Q\in\mathcal{P}}(P^*(Q)-G(Q))$ we can evaluate the expected divergence between our classifier $\hat{P}_n(y\mid\mathbf{x})$ and the true model $P(y\mid\mathbf{x})$
 
 $$
-\begin{aligned}
-\sigma_{\text{OODC}} &= Prob(\text{the $\mathbf{x}$ acts like a data point which we have not seen before})\\
-&= Prob(\text{the training set is bad} \mid \mathbf{x})
-\end{aligned}
+\begin{align*}
+    &\mathbb{E}[d_{G,S}(\hat{P}_n(y\mid\mathbf{x}), P(y\mid\mathbf{x}))]\\
+    =&\mathbb{E}[d_{G^*,S^{-1}}(S(P(y\mid\mathbf{x}))), S(\hat{P}_n(y\mid\mathbf{x}))]\\
+    =&\mathbb{E}[G^*(S(\hat{P}_n(y\mid\mathbf{x}))) - S(\hat{P}_n(y\mid\mathbf{x})) \cdot S^{-1}(S(P(y\mid\mathbf{x})))]\\
+    =&\mathbb{E}[G^*(S(\hat{P}_n(y\mid\mathbf{x})))] - \mathbb{E}[S(\hat{P}_n(y\mid\mathbf{x}))] \cdot S^{-1}(S(P(y\mid\mathbf{x})))\\
+    =&G^*(\mathbb{E}[S(\hat{P}_n(y\mid\mathbf{x}))]) - \mathbb{E}[S(\hat{P}_n(y\mid\mathbf{x}))] \cdot S^{-1}(S(P(y\mid\mathbf{x}))) \\
+    &+ \mathbb{E}[G^*(S(\hat{P}_n(y\mid\mathbf{x})))] - G^*(\mathbb{E}[S(\hat{P}_n(y\mid\mathbf{x}))])\\
+    =&d_{G,S}(\mathbb{E}[\hat{P}_n(y\mid\mathbf{x})], P(y\mid\mathbf{x})) + \mathbb{B}_{G^*}[S(\hat{P}_n(y\mid\mathbf{x}))]\\
+    =& Bias + Variance
+\end{align*}
 $$
 
+ there will be the uncertainty for the result of the classifier, which we can divided it into mainly 2 parts, Bias uncertainty and Variance uncertainty:
 
-* $\sigma_{\mathrm{training}}$:When we have a learning algorithm, in real life cases, we are going to train the model on a training set, while the extant of the training set capturing the feature of the distribution has variance, and the training environments, including software parameter initialization, which leads to the variance of the point predictions by models. This is the uncertainty of the classifier generating process itself. Given a learning algorithm and given a set of training sets and training environments, it can generate a hypothesis class $\mathcal{H}$, where 
 
-$$
-\sigma_{\mathrm{training}} = \mathrm{Var}(h(x) \mid h \in \mathcal{H})
-$$
+* $\sigma_{\mathrm{Bias}}$: Since we trained the classifier on the training set, so the training set is all the information we know about the data distribution, while there are 2 possible situations may happen. The new data(in the test set) from the unknown distribution looks like an outlier for the training set, or the unknown distribution changed(covariate drift). So it will lead to the Bias between our estimated classifier and true model. But we don't know the true model, which lead to how possible there is a large bias which is the uncertainty.
 
-## Out of Distribution Classifier Uncertianty
+
+* $\sigma_{\mathrm{Variance}}$:When we have a learning algorithm, in real life cases, we are going to train the model on a training set, while the extant of the training set capturing the feature of the distribution has variance, and the training environments, including software parameter initialization, which leads to the variance of the point predictions by models. This is the uncertainty of the classifier generating process itself. Given a learning algorithm and given a set of training sets and training environments, it can generate a hypothesis class $\mathcal{H}$, where there is an uncertainty from the predictions.
+
+## Bias Uncertianty
+
+Since we don't know the true model $p(y \mid \mathbf{x})$, we have to figure out another way to evaluate the bias.
 
 ### Kullback-Leibler divergence
+
+The bias can happen in case that the training set is bad, which we may can get some evaluation on this.
 
 For the given training set $S_n = \{(\mathbf{x}_1, y_1), \dots, (\mathbf{{x}}_n, y_n)\}$, we can estimate the joint probability distribution of $(\mathbf{x}, y)$, which is $\hat{P}_{S_n}(\mathbf{x}, y) = \hat{P}_n(y\mid\mathbf{x}) \cdot \hat{P}_{\mathbf{X}_n}(\mathbf{x})$, where $\mathbf{X}_n = \{ \mathbf{x}_1, \cdots, \mathbf{x}_n \}$. If we got a new data point $\mathbf{x}_{n+1}$ without the label, we have $\mathbf{X}_{n+1} = \{ \mathbf{x}_1, \cdots, \mathbf{x}_{n+1} \}$, then we can estimate it again $\hat{P}_{S_n,\mathbf{x}_{n+1}}(\mathbf{x}, y) = \hat{P}_{n}(y\mid\mathbf{x}) \cdot \hat{P}_{\mathbf{X}_{n+1}}(\mathbf{x})$, then we can calculate the  KL divergence between them.
 
@@ -71,13 +83,19 @@ $$
 
 ### Bregman Information
 
-We will first introduce the Bregman divergence, the  **Bregman divergence** generated by a differentiable, convex function $\phi:U \to \mathbb{R}$, where $U$ is a convex set, is defined as
+We will first introduce the Bregman divergence, the  **Bregman Divergence** generated by a differentiable, convex function $\phi:U \to \mathbb{R}$, where $U$ is a convex set, is defined as
 
 $$
 d_{\phi}(x, y) = \phi(y) - \phi(x) - \langle\nabla \phi (x), y - x\rangle
 $$
 
 which can be interpreted geometrically as the difference between $\phi$ and the supporting tangent plane of $\phi(x)$ at $y$.
+
+The functions are not necessarily have the gradient, while for the convex function the subgradiant always exists. So we can define the **Functional Bregman Divergence** as
+
+$$
+d_{\phi, \phi'}(x, y) = \phi(y) - \phi(x) -  \phi' (x) \cdot (y - x)
+$$
 
 The **Bregman Information**(generate by $\phi$) of a random variable $X$ with realizations in $U$ is defined as
 
@@ -131,28 +149,6 @@ $$
 $$
 to evaluate the training uncertainty.
 
-
-## OODC -- the cause
-
-Let $\Phi \subset \mathbb{R}^{d}$ be our connected topological feature space with corresponding cumulative density function $F_{\Phi}$.
-Let $F_{\Phi}$ be strictly stationary, that is $~\forall\tau,t_{1},\ldots,t_{n}\in\mathbb{R}$ and $~\forall n\in\mathbb{N}_{++}$ we have $F_{\Phi}(\mathbf{x}_{t_{1}},\ldots,\mathbf{x}_{t_{n}}) = F_{\Phi}(\mathbf{x}_{t_{1} + \tau},\ldots,\mathbf{x}_{t_{n} + \tau})$.
-
-Let $\phi$ denote a subspace of s.t. $\{\phi_1,\ldots,\phi_k \} = \Phi$ where $\phi_i \cap \phi_j = \emptyset~\forall i, j \in \{1,\dots,k\} \mid i \neq j$.
-
-Let $\mathbf{X} \sim F_{\Phi}$ denote the set of $n$ observed samples drawn from the data generating process.
-Hence, each sample $\mathbf{x}$ is a member of a particular subspace $\phi_i$ s.t. $\mathbf{x} \in \phi_i \subset \mathbb{R}^{d}$ where $i \in \{1,\ldots,m\}$ and $m \ll n$.
-Thus the topological space $\mathcal{X}$ that contains $\mathbf{X}$ consists of $m$, where $m \leq k$, randomly selected subspaces of our feature set: $\mathcal{X} = \{\phi_1,\ldots,\phi_m\} \subseteq \Phi$.
-Which implies that $\mathcal{X}$ is not necessarily a connected subspace of $\Phi$.
-
-Let $\mathbf{x}_{n+\tau}$ denote a observation that is not part of the previously observed data but is identically distributed, i.e. $\mathbf{x}_{n+\tau} \in X_{j} \subset \mathbb{R}^{d}; \mathbf{x}_{n+\tau} \sim F_{\Phi}$ and $\{\mathbf{x}_{n+\tau}\} \cap \mathbf{X} = \emptyset$
-Let $X_{i} = \{\mathbf{x} : \forall~\mathbf{x} \in \phi_i\}$ denote the set of observations that belong the subspace $\phi_i$.
-
-TODO make formal: assumption that points located close together are related to each other and the target feature
-
-Under the above assumption, if there are no points that are located close to $\mathbf{x}_{n+\tau}$ we have no way of knowing what the classifier will do for these points.
-This makes it that there is significant uncertainty on the _correctness_ of the prediction.
-
-The aim is to develop a methodology to estimate the uncertainty over the prediction on $\mathbf{x}_{n+\tau}$ given the previously observed data $\mathbf{X}$.
 
 ## References
 
