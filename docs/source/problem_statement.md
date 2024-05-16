@@ -44,7 +44,7 @@ $$
     =&\mathbb{E}[G^*(S(\hat{P}_n(y\mid\mathbf{x})))] - \mathbb{E}[S(\hat{P}_n(y\mid\mathbf{x}))] \cdot S^{-1}(S(P(y\mid\mathbf{x})))\\
     =&G^*(\mathbb{E}[S(\hat{P}_n(y\mid\mathbf{x}))]) - \mathbb{E}[S(\hat{P}_n(y\mid\mathbf{x}))] \cdot S^{-1}(S(P(y\mid\mathbf{x}))) \\
     &+ \mathbb{E}[G^*(S(\hat{P}_n(y\mid\mathbf{x})))] - G^*(\mathbb{E}[S(\hat{P}_n(y\mid\mathbf{x}))])\\
-    =&d_{G,S}(\mathbb{E}[\hat{P}_n(y\mid\mathbf{x})], P(y\mid\mathbf{x})) + \mathbb{B}_{G^*}[S(\hat{P}_n(y\mid\mathbf{x}))]\\
+    =&d_{G^*,S^{-1}}(S(P(y\mid\mathbf{x})), \mathbb{E}[S(\hat{P}_n(y\mid\mathbf{x}))]) + \mathbb{B}_{G^*}[S(\hat{P}_n(y\mid\mathbf{x}))]\\
     =& Bias + Variance
 \end{align*}
 $$
@@ -102,7 +102,7 @@ The **Bregman Information**(generate by $\phi$) of a random variable $X$ with re
 $$
 \begin{align}
 \mathbb{B}_{\phi}[X] &= \mathbb{E}\left[d_{\phi}\left(\mathbb{E}[X], X\right)\right]\\
-&=\mathbb{E}[\phi(X) - \phi(\mathbb{E}[X]) - \langle\nabla \phi (\mathbb{E}[X]), x - \mathbb{E}[X]\rangle]\\
+&=\mathbb{E}[\phi(X) - \phi(\mathbb{E}[X]) - \phi' (\mathbb{E}[X]) \cdot (x - \mathbb{E}[X])]\\
 &=\mathbb{E}[\phi(X)] - \phi(\mathbb{E}[X])
 \end{align}
 $$
