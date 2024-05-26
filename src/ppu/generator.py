@@ -372,19 +372,23 @@ class RingBlobs(_2dBaseGenerator):
             X: 2D array containing the feature samples
             y: 1D array containing the labels
         """
-        total_size = size * self.n_blobs
+        total_size = size
         blob_size = total_size // self.n_blobs
 
         lb = 0
         ub = blob_size
-        X = np.empty((total_size, 2))
-        y = np.empty(total_size, dtype=int)
+        X = np.zeros((total_size, 2))
+        y = np.zeros(total_size, dtype=int)
         for i in range(self.centers.size):
             X[lb:ub, 0] = self.rng.normal(self.centroids[i, 0], scale=self.scale[0], size=blob_size)
             X[lb:ub, 1] = self.rng.normal(self.centroids[i, 1], scale=self.scale[1], size=blob_size)
             y[lb:ub] = self.labels[i]
             lb = ub
             ub += blob_size
+        if lb < len(X):
+            X[lb:, 0] = self.rng.normal(self.centroids[i, 0], scale=self.scale[0], size=len(X)-lb)
+            X[lb:, 1] = self.rng.normal(self.centroids[i, 1], scale=self.scale[1], size=len(X)-lb)
+            y[lb:] = self.labels[i]
         return X, y
 
     def plot(

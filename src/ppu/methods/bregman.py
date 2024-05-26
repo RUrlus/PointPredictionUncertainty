@@ -18,7 +18,7 @@ from sklearn.inspection import DecisionBoundaryDisplay
 from sklearn.inspection._plot.decision_boundary import _check_boundary_response_method
 
 from ppu.methods.mlp import MLP
-from ppu.methods.utils import BI_LSE, get_dataset, stable_logit_transform, Beta_mean
+from ppu.methods.utils import BI_LSE, get_dataset, stable_logit_transform, Beta_mean, Beta_para
 
 
 def get_BI(xs, models):
@@ -53,8 +53,21 @@ def get_Beta(xs, models, threshold, prior_a=0.5, prior_b=0.5):
 
     labels = np.where(preds >= threshold, 1, 0)
 
-    Betas = np.array([Beta_mean(label, prior_a=0.5, prior_b=0.5) for label in labels.T])
+    Betas = np.array([Beta_mean(label, prior_a, prior_b) for label in labels.T])
     return Betas
+
+def get_Beta_para(start, end, models, threshold, prior_a=0.5, prior_b=0.5, num_points=200):
+    x_coords = np.linspace(start[0], end[0], num_points)
+    y_coords = np.linspace(start[1], end[1], num_points)
+    points = np.vstack((x_coords, y_coords)).T
+    preds = np.array([_check_boundary_response_method(m, "auto")(points) for m in models])
+    # preds are probabilities
+    if len(preds.shape) == 3:
+        preds = preds[:,:,1]
+
+    labels = np.where(preds >= threshold, 1, 0)
+    paras = np.array([Beta_para(label, prior_a, prior_b) for label in labels.T])
+    return paras
 
 def get_models(clf, gen, reps, n_samples=200, **kwargs):
     result = []
