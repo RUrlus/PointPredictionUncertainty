@@ -83,6 +83,13 @@ def Beta_mean(lables, prior_a=0.5, prior_b=0.5):
     p = (prior_a + m) / (prior_a + prior_b + n)
     return min(p, 1-p)
 
+def Beta_para(lables, prior_a=0.5, prior_b=0.5):
+    m = np.count_nonzero(lables)
+    n = len(lables)
+    alpha = prior_a + m
+    beta = n - m + prior_b
+    return alpha, beta
+
 def accuracy(predictions, labels):
     # array indicating which prediction is correct
     correct = np.equal(predictions, labels)

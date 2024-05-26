@@ -100,11 +100,11 @@ $$
 The **Bregman Information**(generate by $\phi$) of a random variable $X$ with realizations in $U$ is defined as
 
 $$
-\begin{align}
+\begin{align*}
 \mathbb{B}_{\phi}[X] &= \mathbb{E}\left[d_{\phi}\left(\mathbb{E}[X], X\right)\right]\\
 &=\mathbb{E}[\phi(X) - \phi(\mathbb{E}[X]) - \phi' (\mathbb{E}[X]) \cdot (x - \mathbb{E}[X])]\\
 &=\mathbb{E}[\phi(X)] - \phi(\mathbb{E}[X])
-\end{align}
+\end{align*}
 $$
 
 which is the generalizes the variance of a random variable since take $U = \mathbb{R}$ and $\phi(x) = x^2$.
