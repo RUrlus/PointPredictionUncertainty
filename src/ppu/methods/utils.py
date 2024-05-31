@@ -1,3 +1,6 @@
+import random
+from copy import deepcopy
+
 import numpy as np
 import pandas as pd
 from scipy.special import logsumexp
@@ -195,3 +198,26 @@ def read_results(severity=5, unc_type="Conf", ds_name="Cifar10-C", target="Accur
     results_.rename(columns={"Conf Quantile": "Validation set quantile", "BI Quantile": "Validation set quantile"}, inplace=True)
 
     return results_.reset_index()
+
+
+def get_models(clf, gen, reps, n_samples=200, **kwargs):
+    result = []
+    for rng in range(reps):
+        (X_train, y_train), (X_test, y_test) = get_dataset(rng, gen, n_samples=n_samples, **kwargs)
+        new_clf = deepcopy(clf)
+        new_clf.fit(X_train, y_train)
+        result.append(new_clf)
+    return result
+
+def BS_models(clf, gen, reps, n_samples=500, **kwargs):
+    result = []
+    seeds = range(reps)
+    (X_train, y_train), (X_test, y_test) = get_dataset(0, gen, n_samples=n_samples, **kwargs)
+    for _ in seeds:
+        bs_ind = random.choices(range(n_samples), k=n_samples)
+        bs_X = X_train[bs_ind]
+        bs_y = y_train[bs_ind]
+        model = deepcopy(clf)
+        model.fit(bs_X, bs_y)
+        result.append(model)
+    return result
