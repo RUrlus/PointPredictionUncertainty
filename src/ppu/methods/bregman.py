@@ -12,7 +12,7 @@ from ppu.methods.utils import BI_LSE, stable_logit_transform
 
 
 def get_BI(xs, models):
-    preds = np.array([_check_boundary_response_method(m, "auto")(xs) for m in models])
+    preds = np.array([_check_boundary_response_method(m, "predict_proba")(xs) for m in models])
     # preds are probabilities
     if len(preds.shape) == 3:
         preds = preds[:,:,1]

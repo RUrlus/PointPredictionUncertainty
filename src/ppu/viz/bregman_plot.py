@@ -112,6 +112,91 @@ def draw_classifier(generator, n_samples, names, classifiers, models, rescale = 
     return figure
 
 
+def draw_classifiers_BIbs(generator, n_samples, selected_clfs, selected_models, n_models=64, rescale=False):
+    dataset = get_dataset(1000, generator, n_samples=n_samples)
+    cbar_kws = {"use_gridspec": False, "location": "bottom"}
+    plt.rcParams.update({"font.size": 15})
+    figure, axs = plt.subplots(2, 5, figsize=(15, 7))
+
+
+    i = 0
+    eps = 1
+    n_ticks = 100
+
+    ds = dataset
+    (X_train, y_train), (X_test, y_test) = ds # X is the data point, y is the class label
+
+    # the area we draw is a bit larger than the range of data points
+    x_min, x_max = X_train[:, 0].min() - eps, X_train[:, 0].max() + eps
+    y_min, y_max = X_train[:, 1].min() - eps, X_train[:, 1].max() + eps
+
+    # just plot the dataset first
+    cm_bright = ListedColormap(["#FF0000", "#0000FF"]) # color for data points 
+    ax = axs[0][i] # position of subgraph
+    ax.set_title("Data") # subgraph title
+    # Plot the training points
+    ax.scatter(X_train[:, 0], X_train[:, 1], c=y_train, cmap=cm_bright, edgecolors="k")
+    ax.set_xlim(x_min, x_max) # axis range
+    ax.set_ylim(y_min, y_max)
+    ax.set_xticks(())
+    ax.set_yticks(())
+    i += 1
+
+    for name in selected_models:
+        ax = axs[0][i]
+        ax.set_title(name)
+        x = np.linspace(x_min, x_max, n_ticks)
+        y = np.linspace(y_min, y_max, n_ticks)
+        xs, ys = np.meshgrid(x, y)
+        X_grid = np.c_[xs.ravel(), ys.ravel()] # same as above
+        response = get_BI(X_grid, selected_models[name])
+        if rescale:
+            vmin = min(response)
+            vmax = max(response)
+            response = (response-vmin) / (vmax-vmin)
+        response = response.reshape(xs.shape)
+
+        with np.errstate(all='ignore'):
+            sns.heatmap(response, ax=ax, cbar_kws=cbar_kws).invert_yaxis()
+
+        ax.set_xticks(())
+        ax.set_yticks(())
+        i += 1
+
+
+    i = 0
+    ax = axs[1][i]
+    ax.axis('off')
+    i += 1
+
+    for name in selected_models:
+        x = np.linspace(x_min, x_max, n_ticks)
+        y = np.linspace(y_min, y_max, n_ticks)
+        xs, ys = np.meshgrid(x, y)
+        X_grid = np.c_[xs.ravel(), ys.ravel()]
+
+        with threadpool_limits(limits=1):
+            response = get_BI(X_grid, BS_models(selected_clfs[name], generator, reps=n_models, n_samples=n_samples))
+        response = response.reshape(xs.shape)
+        ax = axs[1][i]
+
+        with np.errstate(all='ignore'):
+            sns.heatmap(response, ax=ax, cbar_kws=cbar_kws).invert_yaxis()
+
+        ax.set_xticks(())
+        ax.set_yticks(())
+        i += 1
+
+    plt.subplots_adjust(#left=0.1,
+                        bottom=.2,
+                        #right=0.9,
+                        top=.9,
+                        wspace=0.1,
+                        hspace=0.3)
+
+    return figure
+
+
 def draw_diff_variances(classifier, generator, n_samples, variances, n_models=64):
     cbar_kws = {"use_gridspec": False, "location": "bottom"}
     plt.rcParams.update({"font.size": 15})
@@ -324,15 +409,15 @@ def draw_diff_bootstrap(classifier, generator, n_samples, bootstrap, n_models=64
     for i in range(num):
         with threadpool_limits(limits=4):
             response2[i] = get_BI(X_grid, BS_models(classifier, generator, reps=bootstrap[i], n_samples=n_samples))
-        vmin = min(vmin, min(response2[i]))  # noqa: PLW3301
-        vmax = max(vmax, max(response2[i]))  # noqa: PLW3301
+        vmin = min(vmin, *response2[i])
+        vmax = max(vmax, *response2[i])
         response2[i] = response2[i].reshape(xs.shape)
 
     for i in range(num):
         ax = axs[0][i+1]
         ax.set_title(f"bootstrap={bootstrap[i]}")
         with np.errstate(all="ignore"):
-            sns.heatmap(response1, ax=ax, vmin=vmin, vmax=1., cbar_kws=cbar_kws).invert_yaxis()
+            sns.heatmap(response1, ax=ax, vmin=vmin, vmax=vmax, cbar_kws=cbar_kws).invert_yaxis()
 
         ax.set_xticks(())
         ax.set_yticks(())
@@ -341,7 +426,7 @@ def draw_diff_bootstrap(classifier, generator, n_samples, bootstrap, n_models=64
         ax = axs[1][i+1]
 
         with np.errstate(all="ignore"):
-            sns.heatmap(response2[i], ax=ax, vmin=vmin, vmax=1., cbar_kws=cbar_kws).invert_yaxis()
+            sns.heatmap(response2[i], ax=ax, vmin=vmin, vmax=vmax, cbar_kws=cbar_kws).invert_yaxis()
 
         ax.set_xticks(())
         ax.set_yticks(())

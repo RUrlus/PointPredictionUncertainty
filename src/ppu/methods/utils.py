@@ -149,7 +149,6 @@ def get_datasets(seed, n_samples=100, n_test_samples=200):
     )
     return moon_set, circular_set, binormal_set
 
-
 def read_results(severity=5, unc_type="Conf", ds_name="Cifar10-C", target="Accuracy"):
     results_ = pd.read_pickle(f"results/{ds_name}/{target}/{unc_type}_sev{severity}_all.pkl")
     results_ = results_[results_["Accuracy"].notnull()]
@@ -198,7 +197,6 @@ def read_results(severity=5, unc_type="Conf", ds_name="Cifar10-C", target="Accur
     results_.rename(columns={"Conf Quantile": "Validation set quantile", "BI Quantile": "Validation set quantile"}, inplace=True)
 
     return results_.reset_index()
-
 
 def get_models(clf, gen, reps, n_samples=200, **kwargs):
     result = []
