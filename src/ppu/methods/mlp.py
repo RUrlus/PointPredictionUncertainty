@@ -98,7 +98,7 @@ class MLP:
         preds = np.array(preds).T
         return np.array([BI_LSE(zs, bound="lower") for zs in preds])
 
-    def predict(self, xs):
+    def predict_proba(self, xs):
         xs = torch.from_numpy(xs).to(dtype=torch.float32, device=self.device)
         self.model.eval()
         with torch.no_grad():  # Ensures that no gradients are computed

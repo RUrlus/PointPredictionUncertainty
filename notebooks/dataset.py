@@ -1,5 +1,7 @@
-from ppu.generator import GaussianBlobs, Circular, Moons, RingBlobs
+import random
 from copy import deepcopy
+
+from ppu.methods.mlp import MLP
 
 
 def get_dataset(rng, gen, n_samples=200, n_test_samples=200, **kwargs):
@@ -25,7 +27,7 @@ def BS_nn_models(gen, n_models, n_samples=500, **kwargs):
     # bootstrapping
     result = []
     seeds = range(n_models)
-    
+
     (X_train, y_train), (X_test, y_test) = get_dataset(0, gen, n_samples=n_samples)
     for _ in seeds:
         bs_ind = random.choices(range(n_samples), k=n_samples)
