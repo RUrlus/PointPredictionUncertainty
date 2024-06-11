@@ -7,7 +7,7 @@ from sklearn.inspection._plot.decision_boundary import _check_boundary_response_
 from threadpoolctl import threadpool_limits
 
 from ppu.methods.bregman import get_BI
-from ppu.methods.utils import BS_models, get_dataset, get_models
+from ppu.methods.utils import bootstrap_models, get_dataset, get_models
 
 
 def draw_classifier(generator, n_samples, names, classifiers, models, rescale = False):
@@ -31,6 +31,11 @@ def draw_classifier(generator, n_samples, names, classifiers, models, rescale = 
     x_min, x_max = X_train[:, 0].min() - eps, X_train[:, 0].max() + eps
     y_min, y_max = X_train[:, 1].min() - eps, X_train[:, 1].max() + eps
 
+    x = np.linspace(x_min, x_max, n_ticks) # for the heatmap we need to creat the grid first, so n_ticks are the density of the grid nodes
+    y = np.linspace(y_min, y_max, n_ticks)
+    xs, ys = np.meshgrid(x, y)
+    X_grid = np.c_[xs.ravel(), ys.ravel()] # All the grid points
+
     # just plot the dataset first
     cm = plt.cm.RdBu # color map parameter
     cm_bright = ListedColormap(["#FF0000", "#0000FF"]) # color for data points
@@ -48,10 +53,6 @@ def draw_classifier(generator, n_samples, names, classifiers, models, rescale = 
         ax = axs[0][i]
         clf.fit(X_train, y_train) # clf is the method in classifiers
         score = clf.score(X_test, y_test) # score of the result
-        x = np.linspace(x_min, x_max, n_ticks) # for the heatmap we need to creat the grid first, so n_ticks are the density of the grid nodes
-        y = np.linspace(y_min, y_max, n_ticks)
-        xs, ys = np.meshgrid(x, y)
-        X_grid = np.c_[xs.ravel(), ys.ravel()] # All the grid points
 
         response = _check_boundary_response_method(clf, "auto")(X_grid) # the function returns the probability of points(inputs) belong to each class
 
@@ -84,10 +85,6 @@ def draw_classifier(generator, n_samples, names, classifiers, models, rescale = 
     # iterate over classifiers
     for name in models:
         ax = axs[1][i]
-        x = np.linspace(x_min, x_max, n_ticks)
-        y = np.linspace(y_min, y_max, n_ticks)
-        xs, ys = np.meshgrid(x, y)
-        X_grid = np.c_[xs.ravel(), ys.ravel()] # same as above
         response = get_BI(X_grid, models[name])
         if rescale:
             vmin = min(response)
@@ -118,6 +115,7 @@ def draw_classifiers_BIbs(generator, n_samples, selected_clfs, selected_models, 
     plt.rcParams.update({"font.size": 15})
     figure, axs = plt.subplots(2, 5, figsize=(15, 7))
 
+    figure.suptitle(f"Bootstrap = {n_models}")
 
     i = 0
     eps = 1
@@ -130,8 +128,13 @@ def draw_classifiers_BIbs(generator, n_samples, selected_clfs, selected_models, 
     x_min, x_max = X_train[:, 0].min() - eps, X_train[:, 0].max() + eps
     y_min, y_max = X_train[:, 1].min() - eps, X_train[:, 1].max() + eps
 
+    x = np.linspace(x_min, x_max, n_ticks)
+    y = np.linspace(y_min, y_max, n_ticks)
+    xs, ys = np.meshgrid(x, y)
+    X_grid = np.c_[xs.ravel(), ys.ravel()]
+
     # just plot the dataset first
-    cm_bright = ListedColormap(["#FF0000", "#0000FF"]) # color for data points 
+    cm_bright = ListedColormap(["#FF0000", "#0000FF"]) # color for data points
     ax = axs[0][i] # position of subgraph
     ax.set_title("Data") # subgraph title
     # Plot the training points
@@ -145,10 +148,6 @@ def draw_classifiers_BIbs(generator, n_samples, selected_clfs, selected_models, 
     for name in selected_models:
         ax = axs[0][i]
         ax.set_title(name)
-        x = np.linspace(x_min, x_max, n_ticks)
-        y = np.linspace(y_min, y_max, n_ticks)
-        xs, ys = np.meshgrid(x, y)
-        X_grid = np.c_[xs.ravel(), ys.ravel()] # same as above
         response = get_BI(X_grid, selected_models[name])
         if rescale:
             vmin = min(response)
@@ -156,7 +155,7 @@ def draw_classifiers_BIbs(generator, n_samples, selected_clfs, selected_models, 
             response = (response-vmin) / (vmax-vmin)
         response = response.reshape(xs.shape)
 
-        with np.errstate(all='ignore'):
+        with np.errstate(all="ignore"):
             sns.heatmap(response, ax=ax, cbar_kws=cbar_kws).invert_yaxis()
 
         ax.set_xticks(())
@@ -166,21 +165,17 @@ def draw_classifiers_BIbs(generator, n_samples, selected_clfs, selected_models, 
 
     i = 0
     ax = axs[1][i]
-    ax.axis('off')
+    ax.axis("off")
     i += 1
 
     for name in selected_models:
-        x = np.linspace(x_min, x_max, n_ticks)
-        y = np.linspace(y_min, y_max, n_ticks)
-        xs, ys = np.meshgrid(x, y)
-        X_grid = np.c_[xs.ravel(), ys.ravel()]
 
         with threadpool_limits(limits=1):
-            response = get_BI(X_grid, BS_models(selected_clfs[name], generator, reps=n_models, n_samples=n_samples))
+            response = get_BI(X_grid, bootstrap_models(selected_clfs[name], generator, reps=n_models, n_samples=n_samples))
         response = response.reshape(xs.shape)
         ax = axs[1][i]
 
-        with np.errstate(all='ignore'):
+        with np.errstate(all="ignore"):
             sns.heatmap(response, ax=ax, cbar_kws=cbar_kws).invert_yaxis()
 
         ax.set_xticks(())
@@ -202,6 +197,9 @@ def draw_diff_variances(classifier, generator, n_samples, variances, n_models=64
     plt.rcParams.update({"font.size": 15})
     n_fig = len(variances)
     figure, axs = plt.subplots(3, n_fig, figsize=(n_fig * 3, 10.5))
+
+    figure.suptitle(f"Bootstrap = {n_models}")
+
     i = 0
     eps = 1
     n_ticks = 100
@@ -219,7 +217,7 @@ def draw_diff_variances(classifier, generator, n_samples, variances, n_models=64
         x_min, x_max = X_train[:, 0].min() - eps, X_train[:, 0].max() + eps
         y_min, y_max = X_train[:, 1].min() - eps, X_train[:, 1].max() + eps
 
-        cm_bright = ListedColormap(["#FF0000", "#0000FF"]) # color for data points 
+        cm_bright = ListedColormap(["#FF0000", "#0000FF"]) # color for data points
         ax = axs[0][i] # position of subgraph
         ax.set_title(f"Var={variances[i]}") # subgraph title
         # Plot the training points
@@ -239,7 +237,7 @@ def draw_diff_variances(classifier, generator, n_samples, variances, n_models=64
         response1 = response1.reshape(xs.shape)
 
         with threadpool_limits(limits=1):
-            bs_models = BS_models(classifier, generator, reps=n_models, n_samples=n_samples, scale=(variances[i], variances[i]), class_sep=1.7)
+            bs_models = bootstrap_models(classifier, generator, reps=n_models, n_samples=n_samples, scale=(variances[i], variances[i]), class_sep=1.7)
 
         response2 = get_BI(X_grid, bs_models)
         vmin = min(vmin, *response2)
@@ -248,7 +246,7 @@ def draw_diff_variances(classifier, generator, n_samples, variances, n_models=64
 
         ax = axs[1][i]
         #ax.set_title()
-        with np.errstate(all='ignore'):
+        with np.errstate(all="ignore"):
             sns.heatmap(response1, ax=ax, vmin=vmin, vmax=vmax, cbar_kws=cbar_kws).invert_yaxis()
 
         ax.set_xticks(())
@@ -257,7 +255,7 @@ def draw_diff_variances(classifier, generator, n_samples, variances, n_models=64
 
         ax = axs[2][i]
 
-        with np.errstate(all='ignore'):
+        with np.errstate(all="ignore"):
             sns.heatmap(response2, ax=ax, vmin=vmin, vmax=vmax, cbar_kws=cbar_kws).invert_yaxis()
 
         ax.set_xticks(())
@@ -276,10 +274,12 @@ def draw_diff_variances(classifier, generator, n_samples, variances, n_models=64
 
 
 def draw_diff_class_sep(classifier, generator, n_samples, seps, n_models=64):
-    cbar_kws = dict(use_gridspec=False, location="bottom")
-    plt.rcParams.update({'font.size': 15})
+    cbar_kws = {"use_gridspec": False, "location": "bottom"}
+    plt.rcParams.update({"font.size": 15})
     n_fig = len(seps)
     figure, axs = plt.subplots(3, n_fig, figsize=(3 * n_fig, 10.5))
+
+    figure.suptitle(f"Bootstrap = {n_models}")
 
     i = 0
     eps = 1
@@ -320,14 +320,14 @@ def draw_diff_class_sep(classifier, generator, n_samples, seps, n_models=64):
 
 
         with threadpool_limits(limits=4):
-            response2 = get_BI(X_grid, BS_models(classifier, generator, reps=n_models, n_samples=n_samples, class_sep=seps[i]))
-        vmin = min(vmin, min(response2))
-        vmax = max(vmax, max(response2))
+            response2 = get_BI(X_grid, bootstrap_models(classifier, generator, reps=n_models, n_samples=n_samples, class_sep=seps[i]))
+        vmin = min(vmin, *response2)
+        vmax = max(vmax, *response2)
         response2 = response2.reshape(xs.shape)
 
         ax = axs[1][i]
         #ax.set_title()
-        with np.errstate(all='ignore'):
+        with np.errstate(all="ignore"):
             sns.heatmap(response1, ax=ax, vmin=vmin, vmax=vmax, cbar_kws=cbar_kws).invert_yaxis()
 
         ax.set_xticks(())
@@ -336,7 +336,7 @@ def draw_diff_class_sep(classifier, generator, n_samples, seps, n_models=64):
 
         ax = axs[2][i]
 
-        with np.errstate(all='ignore'):
+        with np.errstate(all="ignore"):
             sns.heatmap(response2, ax=ax, vmin=vmin, vmax=vmax, cbar_kws=cbar_kws).invert_yaxis()
 
         ax.set_xticks(())
@@ -374,6 +374,11 @@ def draw_diff_bootstrap(classifier, generator, n_samples, bootstrap, n_models=64
     x_min, x_max = X_train[:, 0].min() - eps, X_train[:, 0].max() + eps
     y_min, y_max = X_train[:, 1].min() - eps, X_train[:, 1].max() + eps
 
+    x = np.linspace(x_min, x_max, n_ticks)
+    y = np.linspace(y_min, y_max, n_ticks)
+    xs, ys = np.meshgrid(x, y)
+    X_grid = np.c_[xs.ravel(), ys.ravel()]
+
     cm_bright = ListedColormap(["#FF0000", "#0000FF"]) # color for data points
     ax = axs[0][0] # position of subgraph
     ax.set_title("Data") # subgraph title
@@ -390,25 +395,15 @@ def draw_diff_bootstrap(classifier, generator, n_samples, bootstrap, n_models=64
     with threadpool_limits(limits=4):
         sep_model = get_models(classifier, generator, reps=n_models, n_samples=n_samples)
 
-    # the area we draw is a bit larger than the range of data points
-    x_min, x_max = X_train[:, 0].min() - eps, X_train[:, 0].max() + eps
-    y_min, y_max = X_train[:, 1].min() - eps, X_train[:, 1].max() + eps
-
-
-
-    x = np.linspace(x_min, x_max, n_ticks)
-    y = np.linspace(y_min, y_max, n_ticks)
-    xs, ys = np.meshgrid(x, y)
-    X_grid = np.c_[xs.ravel(), ys.ravel()]
     response1 = get_BI(X_grid, sep_model)
     vmin = min(response1)
     vmax = max(response1)
     response1 = response1.reshape(xs.shape)
 
-    response2 = [None for j in range(num)]
+    response2 = [np.nan for j in range(num)]
     for i in range(num):
         with threadpool_limits(limits=4):
-            response2[i] = get_BI(X_grid, BS_models(classifier, generator, reps=bootstrap[i], n_samples=n_samples))
+            response2[i] = get_BI(X_grid, bootstrap_models(classifier, generator, reps=bootstrap[i], n_samples=n_samples))
         vmin = min(vmin, *response2[i])
         vmax = max(vmax, *response2[i])
         response2[i] = response2[i].reshape(xs.shape)

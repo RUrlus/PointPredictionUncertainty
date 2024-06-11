@@ -1,8 +1,19 @@
 import numpy as np
 from sklearn.inspection._plot.decision_boundary import _check_boundary_response_method
 
-from ppu.methods.utils import Beta_mean, Beta_para
 
+def beta_mean(lables, prior_a=0.5, prior_b=0.5):
+    m = np.count_nonzero(lables)
+    n = len(lables)
+    p = (prior_a + m) / (prior_a + prior_b + n)
+    return min(p, 1-p)
+
+def beta_para(lables, prior_a=0.5, prior_b=0.5):
+    m = np.count_nonzero(lables)
+    n = len(lables)
+    alpha = prior_a + m
+    beta = n - m + prior_b
+    return alpha, beta
 
 def get_Beta(xs, models, threshold, prior_a=0.5, prior_b=0.5):
     preds = np.array([_check_boundary_response_method(m, "auto")(xs) for m in models])
@@ -12,8 +23,7 @@ def get_Beta(xs, models, threshold, prior_a=0.5, prior_b=0.5):
 
     labels = np.where(preds >= threshold, 1, 0)
 
-    Betas = np.array([Beta_mean(label, prior_a, prior_b) for label in labels.T])
-    return Betas
+    return np.array([beta_mean(label, prior_a, prior_b) for label in labels.T])
 
 def get_Beta_para(start, end, models, threshold, prior_a=0.5, prior_b=0.5, num_points=200):
     x_coords = np.linspace(start[0], end[0], num_points)
@@ -25,5 +35,4 @@ def get_Beta_para(start, end, models, threshold, prior_a=0.5, prior_b=0.5, num_p
         preds = preds[:,:,1]
 
     labels = np.where(preds >= threshold, 1, 0)
-    paras = np.array([Beta_para(label, prior_a, prior_b) for label in labels.T])
-    return paras
+    return np.array([beta_para(label, prior_a, prior_b) for label in labels.T])
