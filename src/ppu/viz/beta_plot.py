@@ -5,12 +5,10 @@ import seaborn as sns
 from matplotlib.colors import ListedColormap
 from plotly.subplots import make_subplots
 from scipy.stats import beta
-from sklearn.inspection import DecisionBoundaryDisplay
-from sklearn.inspection._plot.decision_boundary import _check_boundary_response_method
 from threadpoolctl import threadpool_limits
 
 from ppu.methods.beta import get_Beta, get_Beta_para
-from ppu.methods.utils import BS_models, get_dataset, get_models
+from ppu.methods.utils import bootstrap_models, get_dataset, get_models
 
 
 def draw_beta_bs(classifier, generator, n_samples, bootstrap, n_models=64, threshold=0.5):
@@ -59,19 +57,17 @@ def draw_beta_bs(classifier, generator, n_samples, bootstrap, n_models=64, thres
     y = np.linspace(y_min, y_max, n_ticks)
     xs, ys = np.meshgrid(x, y)
     X_grid = np.c_[xs.ravel(), ys.ravel()]
-    # response1 = get_BI(X_grid, sep_model)
     response1 = get_Beta(X_grid, sep_model, threshold)
     vmin = min(response1)
     vmax = max(response1)
     response1 = response1.reshape(xs.shape)
 
-    response2 = [None for j in range(num)]
+    response2 = [np.nan for j in range(num)]
     for i in range(num):
         with threadpool_limits(limits=4):
-            #response2[i] = get_BI(X_grid, BS_models(func, gen, reps=bootstrap[i], n_samples=n_samples))
-            response2[i] = get_Beta(X_grid, BS_models(classifier, generator, reps=bootstrap[i], n_samples=n_samples), threshold)
-        vmin = min(vmin, min(response2[i]))  # noqa: PLW3301
-        vmax = max(vmax, max(response2[i]))  # noqa: PLW3301
+            response2[i] = get_Beta(X_grid, bootstrap_models(classifier, generator, reps=bootstrap[i], n_samples=n_samples), threshold)
+        vmin = min(vmin, *response2[i])
+        vmax = max(vmax, *response2[i])
         response2[i] = response2[i].reshape(xs.shape)
 
     for i in range(num):
@@ -114,11 +110,11 @@ def draw_beta_pdf(start, end, classifier, generator, n_samples, n_models=64, thr
     y_vals = []
     z_vals = []
 
-    # 逐点绘制Beta分布的pdf
+
     for i, (a, b) in enumerate(zip(paras[:, 0], paras[:, 1])):
         x_pdf = np.linspace(0, 1, 100)
         y_pdf = beta.pdf(x_pdf, a, b)
-        z = np.full_like(x_pdf, x_line[i % len(x_line)])  # 将线段上的点与Beta分布的pdf对应
+        z = np.full_like(x_pdf, x_line[i % len(x_line)])
         x_vals.append(z)
         y_vals.append(x_pdf)
         z_vals.append(y_pdf)
@@ -127,7 +123,7 @@ def draw_beta_pdf(start, end, classifier, generator, n_samples, n_models=64, thr
     y_vals = np.array(y_vals)
     z_vals = np.array(z_vals)
 
-    fig = make_subplots(rows=1, cols=1, specs=[[{'type': 'surface'}]])
+    fig = make_subplots(rows=1, cols=1, specs=[[{"type": "surface"}]])
 
     surface = go.Surface(
         x = x_vals,

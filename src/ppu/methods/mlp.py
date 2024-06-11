@@ -6,11 +6,11 @@ import torch.nn.functional as F
 import torchvision
 from sklearn.model_selection import train_test_split
 
-from ppu.methods.utils import BI_LSE
+from ppu.methods.bregman import BI_LSE
 
 
 class MLP:
-    def __init__(self, in_channels=2, hidden_channels=[100, 1], device="cpu", lr=1e-2, iters=None, patience=5, test_size=0.3, weight_decay=0, frequency=1, criterion=F.binary_cross_entropy_with_logits):
+    def __init__(self, in_channels=2, hidden_channels=[100, 1], device="cpu", lr=1e-2, iters=None, patience=5, test_size=0.3, weight_decay=0, frequency=1, criterion=F.binary_cross_entropy_with_logits) -> None:
         self.device = device
         self.model = torchvision.ops.MLP(in_channels=in_channels, hidden_channels=hidden_channels)
         self.model.to(self.device)
@@ -76,8 +76,6 @@ class MLP:
 
     def test(self, xs, ys):
         self.model.eval()
-        correct = 0
-        total = 0
         with torch.no_grad():
             outputs = self.model(xs)
             if self.hidden_channels[-1]==1:
