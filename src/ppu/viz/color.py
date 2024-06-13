@@ -1,4 +1,5 @@
 """Copyright (c) 2024 ING Analytics Wholesale Banking."""
+
 from __future__ import annotations
 
 import matplotlib as mpl

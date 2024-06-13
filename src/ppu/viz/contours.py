@@ -2,6 +2,7 @@
 
 Copyright (c) 2024 ING Analytics Wholesale Banking
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
