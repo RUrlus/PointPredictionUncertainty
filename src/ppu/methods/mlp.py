@@ -10,7 +10,19 @@ from ppu.methods.bregman import BI_LSE
 
 
 class MLP:
-    def __init__(self, in_channels=2, hidden_channels=[100, 1], device="cpu", lr=1e-2, iters=None, patience=5, test_size=0.3, weight_decay=0, frequency=1, criterion=F.binary_cross_entropy_with_logits) -> None:
+    def __init__(
+        self,
+        in_channels=2,
+        hidden_channels=[100, 1],
+        device="cpu",
+        lr=1e-2,
+        iters=None,
+        patience=5,
+        test_size=0.3,
+        weight_decay=0,
+        frequency=1,
+        criterion=F.binary_cross_entropy_with_logits,
+    ) -> None:
         self.device = device
         self.model = torchvision.ops.MLP(in_channels=in_channels, hidden_channels=hidden_channels)
         self.model.to(self.device)
@@ -78,18 +90,19 @@ class MLP:
         self.model.eval()
         with torch.no_grad():
             outputs = self.model(xs)
-            if self.hidden_channels[-1]==1:
+            if self.hidden_channels[-1] == 1:
                 predicted = torch.gt(outputs.data, 0).squeeze(-1)
             else:
                 predicted = outputs.data.argmax(-1)
         return np.sum(np.equal(predicted.cpu().numpy(), ys.cpu().numpy())) / ys.shape[0]
 
     def estimate_dropout_BI(self, xs, dropout=0.5, n_ens=10):
-
         xs = torch.from_numpy(xs).to(dtype=torch.float32, device=self.device)
         self.model.train()
         state_dict = deepcopy(self.model.state_dict())
-        self.model = torchvision.ops.MLP(in_channels=self.in_channels, hidden_channels=self.hidden_channels, dropout=dropout)
+        self.model = torchvision.ops.MLP(
+            in_channels=self.in_channels, hidden_channels=self.hidden_channels, dropout=dropout
+        )
         self.model.load_state_dict(state_dict)
 
         preds = [self.model(xs).squeeze(-1).detach().cpu().numpy() for _ in range(n_ens)]
