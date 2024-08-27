@@ -1,34 +1,54 @@
+from __future__ import annotations
+
 from copy import deepcopy
+from math import floor
+from typing import TYPE_CHECKING, Callable
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torchvision
-from sklearn.model_selection import train_test_split
 
 from ppu.methods.bregman import BI_LSE
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 
 class MLP:
     def __init__(
         self,
-        in_channels=2,
-        hidden_channels=[100, 1],
-        device="cpu",
-        lr=1e-2,
-        iters=None,
-        patience=5,
-        test_size=0.3,
-        weight_decay=0,
-        frequency=1,
-        criterion=F.binary_cross_entropy_with_logits,
+        in_channels: int = 2,
+        hidden_channels: list[int] = [100, 1],
+        device: str = "cpu",
+        lr: float = 1e-2,
+        weight_decay: float = 0,
+        criterion: Callable = F.binary_cross_entropy_with_logits,
+        patience: int = 5,
+        frequency: int = 1,
+        checkpoint_patience: int = 1,
+        test_size: float = 0.3,
     ) -> None:
+        """Multi Layer perceptron.
+
+        Args:
+            in_channels: dimension of the inputs
+            hidden_channels: size of layers
+            device: the device to run model on, e.g. {"cpu", "cuda"}
+            lr: learning rate
+            weight_decay: weight decay/L2 penalty
+            criterion: cost/loss function
+            patience: number of iterations without improvement before terminating
+            frequency: number of iterations before evaluating on validation set
+            checkpoint_patience: number of iterations the model needs to improve before creating checkpoint.
+            test_size: percentage of input data to use as holdout validation set, only used in for early stopping.
+        """
         self.device = device
         self.model = torchvision.ops.MLP(in_channels=in_channels, hidden_channels=hidden_channels)
         self.model.to(self.device)
         self.criterion = criterion
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
-        self.iters = iters
+
         self.patience = patience
         self.fitted_ = False
         self.test_size = test_size
@@ -36,88 +56,112 @@ class MLP:
         self.hidden_channels = hidden_channels
         self.frequency = frequency
 
-    def fit(self, train_xs, train_ys):
-        train_xs, val_xs, train_ys, val_ys = train_test_split(
-            train_xs, train_ys, test_size=self.test_size, random_state=42
-        )
-        train_xs = torch.from_numpy(train_xs).to(dtype=torch.float32, device=self.device)
-        train_ys = torch.from_numpy(train_ys).to(dtype=torch.float32, device=self.device)
-        val_xs = torch.from_numpy(val_xs).to(dtype=torch.float32, device=self.device)
-        val_ys = torch.from_numpy(val_ys).to(dtype=torch.float32, device=self.device)
+        self.checkpoint_patience = checkpoint_patience
+
+        self._pred_from_output = self._pred_from_single if self.hidden_channels[-1] == 1 else self._pred_from_mutli
+
+    def _arr_to_device(self, x: NDArray | torch.Tensor, dtype=None) -> torch.Tensor:
+        if dtype:
+            return (x if isinstance(x, torch.Tensor) else torch.from_numpy(x)).to(dtype=dtype, device=self.device)
+        return (x if isinstance(x, torch.Tensor) else torch.from_numpy(x)).to(device=self.device)
+
+    def _pred_from_single(self, outputs) -> torch.Tensor:
+        return torch.gt(outputs.data, 0).squeeze(-1)
+
+    def _pred_from_mutli(self, outputs) -> torch.Tensor:
+        return outputs.data.argmax(-1)
+
+    def fit(self, X: NDArray | torch.Tensor, y: NDArray | torch.Tensor, n_iter: int | None = None):
+        X = X if isinstance(X, torch.Tensor) else torch.from_numpy(X)
+        y = y if isinstance(y, torch.Tensor) else torch.from_numpy(y)
+
+        if n_iter is not None:
+            X_train = X.to(dtype=torch.float32, device=self.device)
+            y_train = y.to(dtype=torch.float32, device=self.device)
+            for _ in range(n_iter):
+                self.train_epoch(X, y)
+            self.fitted_ = True
+            return
+
+        n_samples = y.size(0)
+        sample_idx = torch.ones(n_samples).multinomial(n_samples - 1, replacement=False)
+        n_test_samples = floor(n_samples * self.test_size)
+
+        X_train = X[sample_idx[:-n_test_samples]].to(dtype=torch.float32, device=self.device)
+        y_train = y[sample_idx[:-n_test_samples]].to(dtype=torch.float32, device=self.device)
+
+        X_val = X[sample_idx[-n_test_samples:]].to(dtype=torch.float32, device=self.device)
+        y_val = y[sample_idx[-n_test_samples:]].to(dtype=torch.float32, device=self.device)
 
         acc_best = 0
         patience_akk = 0
-
-        while self.iters is None:
+        check_patience_akk = 0
+        while True:
             iters_cnt = 0
             # run for 'frequency' number of times before validating
             while iters_cnt < self.frequency:
                 iters_cnt += 1
-                self.train_epoch(train_xs, train_ys)
+                self.train_epoch(X_train, y_train)
 
-            acc = self.test(val_xs, val_ys)
+            acc = self.test(X_val, y_val)
 
             # if our accuracy goes down, increment the patience accumulator
-            if acc_best >= acc:
+            if acc_best > acc or np.isclose(acc_best, acc):
                 patience_akk += 1
             # or reset the accumulator and the best accuracy
             else:
-                patience_akk = 0
                 acc_best = acc
-                save_obj = deepcopy(self.model.state_dict())
+                patience_akk = 0
+                check_patience_akk += 1
+                if check_patience_akk >= self.checkpoint_patience:
+                    model_checkpoint = deepcopy(self.model.state_dict())
+                    check_patience_akk = 0
 
             if patience_akk >= self.patience:
-                self.model.load_state_dict(save_obj)
+                self.model.load_state_dict(model_checkpoint)
                 return
 
-        if self.iters is not None:
-            for _ in range(self.iters):
-                self.train_epoch(train_xs, train_ys)
-
-        self.fitted_ = True
-
-    def train_epoch(self, xs, ys):
-        xs, ys = xs.to(self.device), ys.to(self.device)
-        self.model.to(self.device)
+    def train_epoch(self, X: torch.Tensor, y: torch.Tensor) -> None:
         self.model.train()
         self.optimizer.zero_grad()
-        output = self.model(xs)
-        loss = self.criterion(output.squeeze(-1), ys)
-        loss.backward()
+        # criterion -> loss; loss.backward
+        self.criterion(self.model(X).squeeze(-1), y).backward()
         self.optimizer.step()
 
-    def test(self, xs, ys):
+    def test(self, X: torch.Tensor, y: torch.Tensor, threshold: float = 0.5):
         self.model.eval()
         with torch.no_grad():
-            outputs = self.model(xs)
-            if self.hidden_channels[-1] == 1:
-                predicted = torch.gt(outputs.data, 0).squeeze(-1)
-            else:
-                predicted = outputs.data.argmax(-1)
-        return np.sum(np.equal(predicted.cpu().numpy(), ys.cpu().numpy())) / ys.shape[0]
+            pred = self._pred_from_output(self.model(X))
+        return torch.sum(torch.eq(pred, y)) / y.shape[0]
 
-    def estimate_dropout_BI(self, xs, dropout=0.5, n_ens=10):
-        xs = torch.from_numpy(xs).to(dtype=torch.float32, device=self.device)
+    def predict_proba(self, X: NDArray | torch.Tensor) -> NDArray:
+        X = self._arr_to_device(X, dtype=torch.float32)
+        self.model.eval()
+        with torch.no_grad():  # Ensures that no gradients are computed
+            # Apply sigmoid to convert logits to probabilities
+            return torch.sigmoid(self.model(X).squeeze(-1)).detach().cpu().numpy()
+
+    def score(self, X: NDArray | torch.Tensor, y: NDArray | torch.Tensor, threshold: float = 0.5) -> NDArray:
+        X = self._arr_to_device(X, dtype=torch.float32)
+        y = self._arr_to_device(y, dtype=torch.float32)
+
+        self.model.eval()
+        with torch.no_grad():  # Ensures that no gradients are computed
+            # Apply sigmoid to convert logits to probabilities
+            proba = torch.sigmoid(self.model(X).squeeze(-1)).detach()
+        return torch.eq(torch.ge(proba, threshold), y).cpu().numpy().astype(int)
+
+    def estimate_dropout_BI(self, X: NDArray | torch.Tensor, dropout=0.5, n_ens=10):
+        X = self._arr_to_device(X)
         self.model.train()
-        state_dict = deepcopy(self.model.state_dict())
+        checkpoint = deepcopy(self.model.state_dict())
         self.model = torchvision.ops.MLP(
             in_channels=self.in_channels, hidden_channels=self.hidden_channels, dropout=dropout
         )
-        self.model.load_state_dict(state_dict)
+        self.model.to(self.device)
+        self.model.load_state_dict(checkpoint)
 
-        preds = [self.model(xs).squeeze(-1).detach().cpu().numpy() for _ in range(n_ens)]
+        with self.no_grad():
+            preds = [self.model(X).squeeze(-1).detach().cpu().numpy() for _ in range(n_ens)]
         preds = np.array(preds).T
         return np.array([BI_LSE(zs, bound="lower") for zs in preds])
-
-    def predict_proba(self, xs):
-        xs = torch.from_numpy(xs).to(dtype=torch.float32, device=self.device)
-        self.model.eval()
-        with torch.no_grad():  # Ensures that no gradients are computed
-            logits = self.model(xs).squeeze(-1)
-            probabilities = torch.sigmoid(logits)  # Apply sigmoid to convert logits to probabilities
-            return probabilities.detach().cpu().numpy()
-
-    def score(self, xs, ys):
-        xs = torch.from_numpy(xs).to(dtype=torch.float32, device=self.device)
-        ys = torch.from_numpy(ys).to(dtype=torch.float32, device=self.device)
-        return self.test(xs, ys)
