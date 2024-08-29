@@ -49,6 +49,8 @@ class MLP:
         self.criterion = criterion
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
 
+        self._opt_lr = lr
+        self._opt_weight_decay = weight_decay
         self.patience = patience
         self.fitted_ = False
         self.test_size = test_size
@@ -103,7 +105,7 @@ class MLP:
                 iters_cnt += 1
                 self.train_epoch(X_train, y_train)
 
-            acc = self.test(X_val, y_val)
+            acc = self.test(X_val, y_val).detach().cpu().numpy()
 
             # if our accuracy goes down, increment the patience accumulator
             if acc_best > acc or np.isclose(acc_best, acc):
