@@ -1,106 +1,203 @@
-import contextlib
+from __future__ import annotations
+
 import copy
-import random
+from math import floor
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
-from sklearn.neighbors import KDTree
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+    from torch import Tensor
+
+    from ppu.methods.mlp import MLP
 
 
-def get_tracin(X, label, nn, iter=1, train=None, mode="random", num=None, resample=False):
-    loss1 = []
-    loss2 = []
-    tracin = []
-    if num is None:
-        if mode == "neighbor":
-            num = 10
-        elif mode in ("random", "uniform"):
-            num = int(len(X) / 4)
-    if not isinstance(label, np.ndarray):
-        label = np.array([label for i in range(len(X))])
-    if train is None:
-        for i in range(len(X)):
-            x = torch.tensor(X[i]).to(torch.float32)
-            label_t = torch.tensor(label[i]).to(torch.float32)
-            output1 = nn.model(x)
-            loss1.append(nn.criterion(output1.squeeze(-1), label_t).detach().cpu().numpy())
-            nn_next = copy.deepcopy(nn)
-            for j in range(iter):
-                nn_next.train_epoch(x, label_t)
-            output2 = nn_next.model(x)
-            loss2.append(nn_next.criterion(output2.squeeze(-1), label_t).detach().cpu().numpy())
-            del nn_next
-            tracin.append(loss1[-1] - loss2[-1])
+def get_loss_over_grid(X_test: NDArray | Tensor, y_test: int | NDArray[int] | Tensor[int], mlp: MLP) -> NDArray[float]:
+    """Get loss of `mlp` over every point in `X_test`.
+
+    Args:
+        X_test: the points to test
+        y_test: the label(s) to evaluate for `X_test` with
+        mlp: trained classifier
+
+    Returns:
+        loss: array of shape (X_test.shape[0])
+
+    """
+    # move to torch and device
+    if isinstance(y_test, (int, float)):
+        y_test = torch.full(size=(X_test.shape[0], 1), fill_value=y_test, dtype=torch.float32, device=mlp.device)
     else:
-        for i in range(len(X)):
-            output1 = nn.model(torch.tensor(X[i]).to(torch.float32).to(device=nn.device))
-            loss1.append(nn.criterion(output1.squeeze(-1), torch.tensor(label[i]).to(torch.float32).to(device=nn.device)).detach().cpu().numpy())
-            nn_next = copy.deepcopy(nn)
-            if mode == "neighbor":
-                tree = KDTree(train[0])
-                dist, ind = tree.query(X[[i]], k=num)
-                x = np.append(train[0][ind[0]], X[[i]], axis=0)
-                x = torch.from_numpy(x).to(dtype=torch.float32)
-                label_t = np.append(train[1][ind[0]], label[i])
-                label_t = torch.from_numpy(label_t).to(dtype=torch.float32)
-            elif mode == "random":
-                random.seed(0)
-                ind = random.sample(range(len(train[0])), num)
-                x = np.append(train[0][ind], X[[i]], axis=0)
-                x = torch.from_numpy(x).to(dtype=torch.float32)
-                label_t = np.append(train[1][ind], label[i])
-                label_t = torch.from_numpy(label_t).to(dtype=torch.float32)
-            elif mode == "uniform":
-                x_min, x_max = train[0][:, 0].min(), train[0][:, 0].max()
-                y_min, y_max = train[0][:, 1].min(), train[0][:, 1].max()
-                grid_size = (x_max - x_min) / int(num**0.5)
-                grid = {}
-                # Assign points to grid cells
-                for idx, point in enumerate(train[0]):
-                    x_idx = int((point[0] - x_min) / grid_size)
-                    y_idx = int((point[1] - y_min) / grid_size)
-                    grid_cell = (x_idx, y_idx)
-                    if grid_cell not in grid:
-                        grid[grid_cell] = []
-                    grid[grid_cell].append((point, idx))
-                # Select one point per occupied grid cell and get their indices
-                ind = [pts[0][1] for pts in grid.values()]
-                x = torch.from_numpy(train[0][ind]).to(dtype=torch.float32)
-                label_t = torch.from_numpy(train[1][ind]).to(dtype=torch.float32)
-            for j in range(iter):
-                if resample and mode != "neighbor":
-                    if mode == "random":
-                        random.seed(j + 1)
-                        ind = random.sample(range(len(train[0])), num)
-                        x = np.append(train[0][ind], X[[i]], axis=0)
-                        x = torch.from_numpy(x).to(dtype=torch.float32)
-                        label_t = np.append(train[1][ind], label[i])
-                        label_t = torch.from_numpy(label_t).to(dtype=torch.float32)
-                    elif mode == "uniform":
-                        x_min, x_max = train[0][:, 0].min(), train[0][:, 0].max()
-                        y_min, y_max = train[0][:, 1].min(), train[0][:, 1].max()
-                        grid_size = (x_max - x_min) / int(num**0.5)
-                        grid = {}
-                        # Assign points to grid cells
-                        for idx, point in enumerate(train[0]):
-                            x_idx = int((point[0] - x_min) / grid_size)
-                            y_idx = int((point[1] - y_min) / grid_size)
-                            grid_cell = (x_idx, y_idx)
-                            if grid_cell not in grid:
-                                grid[grid_cell] = []
-                            grid[grid_cell].append((point, idx))
-                        # Select one point per occupied grid cell and get their indices
-                        ind = []
-                        for pts in grid.values():
-                            for k in range(j):
-                                with contextlib.suppress(Exception):
-                                    idx = pts[j-k][1]
-                            ind.append(idx)
-                        x = torch.from_numpy(train[0][ind]).to(dtype=torch.float32)
-                        label_t = torch.from_numpy(train[1][ind]).to(dtype=torch.float32)
-                nn_next.train_epoch(x, label_t)
-            output2 = nn_next.model(torch.tensor(X[i]).to(torch.float32).to(device=nn.device))
-            loss2.append(nn_next.criterion(output2.squeeze(-1), torch.tensor(label[i]).to(torch.float32).to(device=nn.device)).detach().cpu().numpy())
-            del nn_next
-            tracin.append(loss1[-1] - loss2[-1])
-    return np.array(loss1), np.array(loss2), np.array(tracin)
+        y_test = torch.from_numpy(y_test).to(dtype=torch.float32, device=mlp.device)
+
+    return (
+        mlp.criterion(
+            mlp.model(torch.from_numpy(X_test).to(dtype=torch.float32, device=mlp.device)), y_test, reduction="none"
+        )
+        .detach()
+        .cpu()
+        .numpy()
+    )
+
+
+def get_random_resampled_tracin(
+    X_test: NDArray | Tensor,
+    y_test: int | NDArray[int] | Tensor[int],
+    X_train: NDArray | Tensor,
+    y_train: NDArray | Tensor,
+    mlp: MLP,
+    n_iter: int = 1,
+    batch_size: int | float = 10,
+    rng: np.random.Generator | None = None,
+) -> NDArray[float]:
+    """Compute tracin score for `X_test` point(s) and label(s) `y_test` using a randomly sampled batch for each point.
+
+    Args:
+        X_test: the points to test
+        y_test: the label(s) to evaluate for `X_test` with
+        X_train: the training data to sample the batches from
+        y_train: the training labels to sample the batches from
+        mlp: trained classifier
+        n_iter: number of iterations/epochs the model is trained with the new batch
+        batch_size: number or fraction of training data to include in the batch
+        rng: random state used for sampling the batch.
+
+    Returns:
+        tracin: array of shape (X_test.shape[0], n_iter)
+
+    """
+    rng = rng or np.random.Generator(np.random.PCG64DXSM())
+    n_points, ncols = X_test.shape
+    batch_size = batch_size if isinstance(batch_size, int) else floor(n_points * batch_size)
+    x_rows, x_cols = X_train.shape
+
+    mlp = copy.deepcopy(mlp)
+    mlp.model.to("cpu")
+
+    # reset optimizer
+    mlp.optimizer = torch.optim.Adam(mlp.model.parameters(), lr=mlp._opt_lr, weight_decay=mlp._opt_weight_decay)
+    mlp.model.to(mlp.device)
+
+    # make checkpoints
+    model_state = copy.deepcopy(mlp.model.state_dict())
+    opt_state = copy.deepcopy(mlp.optimizer.state_dict())
+
+    # move to torch and device
+    if isinstance(y_test, (int, float)):
+        y_test = torch.full(size=(n_points, 1), fill_value=y_test, dtype=torch.float32, device=mlp.device)
+    else:
+        y_test = torch.from_numpy(y_test).to(dtype=torch.float32, device=mlp.device)
+
+    X_test = torch.from_numpy(X_test).to(dtype=torch.float32, device=mlp.device)
+    y_train = torch.from_numpy(y_train).to(dtype=torch.float32, device=mlp.device)
+    X_train = torch.from_numpy(X_train).to(dtype=torch.float32, device=mlp.device)
+
+    x_idx = np.arange(x_rows)
+    x_batch = torch.empty((batch_size + 1, x_cols), device=mlp.device, dtype=torch.float32)
+    y_batch = torch.empty(batch_size + 1, device=mlp.device, dtype=torch.float32)
+
+    tracin = np.empty((n_points, n_iter), dtype=float)
+    for i in range(n_points):
+        test_point = X_test[i, :]
+        test_label = y_test[i]
+
+        # restore state
+        mlp.optimizer.load_state_dict(opt_state)
+        mlp.model.load_state_dict(model_state)
+        loss_before = mlp.criterion(mlp.model(test_point).squeeze(-1), test_label.squeeze(-1)).detach().cpu().numpy()
+
+        # sample the training data
+        ridx = rng.choice(x_idx, size=batch_size, replace=False)
+        x_batch[:batch_size] = X_train[ridx]
+        x_batch[-1] = test_point
+        y_batch[:batch_size] = y_train[ridx]
+        y_batch[-1] = test_label
+
+        for j in range(n_iter):
+            mlp.train_epoch(x_batch, y_batch)
+            ll = mlp.criterion(mlp.model(test_point).squeeze(-1), test_label.squeeze(-1)).detach().cpu().numpy()
+            tracin[i, j] = loss_before - ll
+
+    return tracin
+
+
+def get_random_tracin(
+    X_test: NDArray | Tensor,
+    y_test: int | NDArray[int] | Tensor[int],
+    X_train: NDArray | Tensor,
+    y_train: NDArray | Tensor,
+    mlp: MLP,
+    n_iter: int = 1,
+    batch_size: int | float = 10,
+    rng: np.random.Generator | None = None,
+) -> NDArray[float]:
+    """Compute tracin score for `X_test` point(s) and label(s) `y_test` using a randomly sampled batch for each point.
+
+    Args:
+        X_test: the points to test
+        y_test: the label(s) to evaluate for `X_test` with
+        X_train: the training data to sample the batches from
+        y_train: the training labels to sample the batches from
+        mlp: trained classifier
+        n_iter: number of iterations/epochs the model is trained with the new batch
+        batch_size: number or fraction of training data to include in the batch
+        rng: random state used for sampling the batch.
+
+    Returns:
+        tracin: array of shape (X_test.shape[0], n_iter)
+
+    """
+    rng = rng or np.random.Generator(np.random.PCG64DXSM())
+    n_points, ncols = X_test.shape
+    x_rows, x_cols = X_train.shape
+
+    mlp = copy.deepcopy(mlp)
+    mlp.model.to("cpu")
+
+    # reset optimizer
+    mlp.optimizer = torch.optim.Adam(mlp.model.parameters(), lr=mlp._opt_lr, weight_decay=mlp._opt_weight_decay)
+    mlp.model.to(mlp.device)
+
+    # make checkpoints
+    model_state = copy.deepcopy(mlp.model.state_dict())
+    opt_state = copy.deepcopy(mlp.optimizer.state_dict())
+
+    # move to torch and device
+    if isinstance(y_test, (int, float)):
+        y_test = torch.full(size=(n_points, 1), fill_value=y_test, dtype=torch.float32, device=mlp.device)
+    else:
+        y_test = torch.from_numpy(y_test).to(dtype=torch.float32, device=mlp.device)
+
+    X_test = torch.from_numpy(X_test).to(dtype=torch.float32, device=mlp.device)
+    y_train = torch.from_numpy(y_train).to(dtype=torch.float32, device=mlp.device)
+    X_train = torch.from_numpy(X_train).to(dtype=torch.float32, device=mlp.device)
+
+    x_idx = np.arange(x_rows)
+    ridx = rng.choice(x_idx, size=batch_size, replace=False)
+    x_batch = torch.empty((batch_size + 1, x_cols), device=mlp.device, dtype=torch.float32)
+    x_batch[:batch_size] = X_train[ridx]
+    y_batch = torch.empty(batch_size + 1, device=mlp.device, dtype=torch.float32)
+    y_batch[:batch_size] = y_train[ridx]
+
+    tracin = np.empty((n_points, n_iter), dtype=float)
+    for i in range(n_points):
+        test_point = X_test[i, :]
+        test_label = y_test[i]
+
+        # restore state
+        mlp.optimizer.load_state_dict(opt_state)
+        mlp.model.load_state_dict(model_state)
+        loss_before = mlp.criterion(mlp.model(test_point).squeeze(-1), test_label.squeeze(-1)).detach().cpu().numpy()
+
+        # sample the training data
+        x_batch[-1] = test_point
+        y_batch[-1] = test_label
+
+        for j in range(n_iter):
+            mlp.train_epoch(x_batch, y_batch)
+            ll = mlp.criterion(mlp.model(test_point).squeeze(-1), test_label.squeeze(-1)).detach().cpu().numpy()
+            tracin[i, j] = loss_before - ll
+
+    return tracin
