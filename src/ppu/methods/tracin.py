@@ -14,34 +14,46 @@ if TYPE_CHECKING:
     from ppu.methods.mlp import MLP
 
 
-def get_loss_over_grid(X_test: NDArray | Tensor, y_test: int | NDArray[int] | Tensor[int], mlp: MLP) -> NDArray[float]:
+def get_loss_over_grid(X: NDArray | Tensor, y: int | NDArray[int] | Tensor[int], mlp: MLP) -> NDArray[float]:
     """Get loss of `mlp` over every point in `X_test`.
 
     Args:
-        X_test: the points to test
-        y_test: the label(s) to evaluate for `X_test` with
+        X: the points to test
+        y: the label(s) to evaluate for `X` with
         mlp: trained classifier
 
     Returns:
-        loss: array of shape (X_test.shape[0])
+        loss: array of shape (X.shape[0])
 
     """
     # move to torch and device
-    if isinstance(y_test, (int, float)):
-        y_test = torch.full(size=(X_test.shape[0], 1), fill_value=y_test, dtype=torch.float32, device=mlp.device)
+    if isinstance(y, (int, float)):
+        y = torch.full(size=(X.shape[0], 1), fill_value=y, dtype=torch.float32, device=mlp.device)
     else:
-        y_test = torch.from_numpy(y_test).to(dtype=torch.float32, device=mlp.device)
+        y = torch.from_numpy(y).to(dtype=torch.float32, device=mlp.device)
 
     return (
-        mlp.criterion(
-            mlp.model(torch.from_numpy(X_test).to(dtype=torch.float32, device=mlp.device)), y_test, reduction="none"
-        )
+        mlp.criterion(mlp.model(torch.from_numpy(X).to(dtype=torch.float32, device=mlp.device)), y, reduction="none")
         .detach()
         .cpu()
         .numpy()
     )
 
 
+def get_proba_over_grid(X: NDArray | Tensor, mlp: MLP) -> NDArray[float]:
+    """Get proba of `mlp` over every point in `X_test`.
+
+    Args:
+        X: the points to evaluate
+        mlp: trained classifier
+
+    Returns:
+        loss: array of shape (X_test.shape[0])
+
+    """
+    return (
+        torch.sigmoid(mlp.model(torch.from_numpy(X).to(dtype=torch.float32, device=mlp.device))).detach().cpu().numpy()
+    )
 def get_random_resampled_tracin(
     X_test: NDArray | Tensor,
     y_test: int | NDArray[int] | Tensor[int],
@@ -73,8 +85,8 @@ def get_random_resampled_tracin(
     batch_size = batch_size if isinstance(batch_size, int) else floor(n_points * batch_size)
     x_rows, x_cols = X_train.shape
 
-    mlp = copy.deepcopy(mlp)
     mlp.model.to("cpu")
+    mlp = copy.deepcopy(mlp)
 
     # reset optimizer
     mlp.optimizer = torch.optim.Adam(mlp.model.parameters(), lr=mlp._opt_lr, weight_decay=mlp._opt_weight_decay)
