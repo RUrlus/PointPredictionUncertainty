@@ -54,6 +54,8 @@ def get_proba_over_grid(X: NDArray | Tensor, mlp: MLP) -> NDArray[float]:
     return (
         torch.sigmoid(mlp.model(torch.from_numpy(X).to(dtype=torch.float32, device=mlp.device))).detach().cpu().numpy()
     )
+
+
 def get_random_resampled_tracin(
     X_test: NDArray | Tensor,
     y_test: int | NDArray[int] | Tensor[int],

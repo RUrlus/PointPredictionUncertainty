@@ -2,7 +2,57 @@ import random
 from copy import deepcopy
 
 import numpy as np
+from numpy.lib.stride_tricks import as_strided
 from scipy.special import logsumexp
+
+
+def view_as_blocks(arr_in, block_shape):
+    """Block view of the input n-dimensional array (using re-striding).
+
+    taken from: scikit-image/skimage/util/shape.py
+
+    Blocks are non-overlapping views of the input array.
+
+    Parameters
+    ----------
+    arr_in : ndarray
+        N-d input array.
+    block_shape : tuple
+        The shape of the block. Each dimension must divide evenly into the
+        corresponding dimensions of `arr_in`.
+
+    Returns:
+    arr_out : ndarray
+        Block view of the input array.  If `arr_in` is non-contiguous, a copy
+        is made.
+
+    """
+    if not isinstance(block_shape, tuple):
+        msg = "block needs to be a tuple"
+        raise TypeError(msg)
+
+    block_shape = np.array(block_shape)
+    if (block_shape <= 0).any():
+        msg = "'block_shape' elements must be strictly positive"
+        raise ValueError(msg)
+
+    if block_shape.size != arr_in.ndim:
+        msg = "'block_shape' must have the same length " "as 'arr_in.shape'"
+        raise ValueError(msg)
+
+    arr_shape = np.array(arr_in.shape)
+    if (arr_shape % block_shape).sum() != 0:
+        msg = "'block_shape' is not compatible with 'arr_in'"
+        raise ValueError(msg)
+
+    # -- restride the array to build the block view
+    arr_in = np.ascontiguousarray(arr_in)
+
+    new_shape = tuple(arr_shape // block_shape) + tuple(block_shape)
+    new_strides = tuple(arr_in.strides * block_shape) + arr_in.strides
+
+    return as_strided(arr_in, shape=new_shape, strides=new_strides)
+
 
 # The following 6 functions are adapted from the following source:
 
