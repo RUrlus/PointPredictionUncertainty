@@ -29,7 +29,15 @@ class GridPlot:
         x0_, x1_ = np.meshgrid(self.x0, self.x1)
         self.X_grid = np.c_[x0_.ravel(), x1_.ravel()]
 
-    def plot(self, values: NDArray, overlay: bool = False, ax=None, **kwargs):
+    def plot(
+        self,
+        values: NDArray,
+        overlay: bool = False,
+        ax=None,
+        vmax: float | None = None,
+        cmap: str | None = None,
+        **kwargs,
+    ):
         if ax is None:
             fig, ax = plt.subplots(figsize=(9, 8))
         else:
@@ -38,8 +46,9 @@ class GridPlot:
         if values.shape != self.grid_shape:
             values = values.reshape(*self.grid_shape)
 
-        cmap = "Blues_r" if not overlay else "Greys_r"
-        c = ax.pcolormesh(self.x0, self.x1, values, cmap=cmap, vmin=0, vmax=values.max(), alpha=0.95)
+        vmax = vmax or values.max()
+        cmap = cmap or ("Blues_r" if not overlay else "Greys_r")
+        c = ax.pcolormesh(self.x0, self.x1, values, cmap=cmap, vmin=0, vmax=vmax, alpha=0.95, **kwargs)
         # set the limits of the plot to the limits of the data
         fig.colorbar(c, ax=ax)
 
@@ -49,3 +58,4 @@ class GridPlot:
             else:
                 ax = plot_dense_binary_scatter(X=self.X, y=self.y, ax=ax, alpha=0.3)
         fig.tight_layout()
+        return ax
