@@ -34,6 +34,8 @@ class TracIn:
         self.mlp = copy.deepcopy(mlp)
         self.device = self.mlp.device
         self.model = self.mlp.model
+        self.og_model_state = copy.deepcopy(self.model.state_dict())
+        self.og_opt_state = copy.deepcopy(self.mlp.optimizer.state_dict())
         self.X_train = X_train
         self.y_train = y_train
         self.X_idx = np.arange(X_train.shape[0])
@@ -44,6 +46,7 @@ class TracIn:
         values: NDArray,
         overlay: bool = False,
         ax=None,
+        vmin: float | None = None,
         vmax: float | None = None,
         cmap: str | None = None,
         **kwargs,
@@ -56,9 +59,10 @@ class TracIn:
         if values.shape != (self.n_ticks, self.n_ticks):
             values = values.reshape(self.n_ticks, self.n_ticks)
 
-        vmax = vmax or values.max()
+        vmin = vmin if vmin is not None else values.min()
+        vmax = vmax if vmax is not None else values.max()
         cmap = cmap or ("Blues_r" if not overlay else "Greys_r")
-        c = ax.pcolormesh(self.x_axis, self.y_axis, values, cmap=cmap, vmin=0, vmax=vmax, alpha=0.95, **kwargs)
+        c = ax.pcolormesh(self.x_axis, self.y_axis, values, cmap=cmap, vmin=vmin, vmax=vmax, alpha=0.95, **kwargs)
         # set the limits of the plot to the limits of the data
         fig.colorbar(c, ax=ax)
 
@@ -66,6 +70,10 @@ class TracIn:
             ax = plot_dense_binary_scatter(X=self.X_train, y=self.y_train, ax=ax, alpha=0.3)
         fig.tight_layout()
         return ax
+
+    def _restore_og_model_state(self):
+        self.model.load_state_dict(self.og_model_state)
+        self.mlp.optimizer.load_state_dict(self.og_opt_state)
 
     def _create_grids(self, X: NDArray, n_points: int, n_ticks: int, border: float):
         self.grid_border = border
@@ -129,7 +137,7 @@ class TracIn:
             .numpy()
         )
 
-    def _fit_point(self, label: float):
+    def _fit_point_early_stopping(self, label: float):
         p_iter = 0
         iter_cnt = 0
         min_loss = 1e6
@@ -173,6 +181,7 @@ class TracIn:
         self.opt_state = copy.deepcopy(self.mlp.optimizer.state_dict())
 
     def trace_points(self, batch_size: int = 500, n_iters: int = 40, patience: int = 5):
+        self._restore_og_model_state()
         self.n_iters_ = n_iters
         self.patience_ = patience
         self.loss_store = np.empty(patience, dtype=np.float32)
@@ -205,27 +214,64 @@ class TracIn:
             uidx = lidx + self.n_block_ticks
             grid_X_block_T = block_X_grid_t[lidx:uidx]
             order_index_block = self.block_idx_rvl[lidx:uidx]
+            self._fit_point_early_stopping(label=0.0)
+            grid_l1[order_index_block] = self.mlp.element_loss(grid_X_block_T, loss_y0_t).cpu().numpy()
+            self._fit_point_early_stopping(label=1.0)
+            grid_l1[order_index_block] = self.mlp.element_loss(grid_X_block_T, loss_y1_t).cpu().numpy()
 
-            self._fit_point(label=0.0)
-            l0_loss = (
-                self.mlp.criterion(self.model(grid_X_block_T).squeeze(-1), loss_y0_t, reduction="none")
-                .detach()
-                .cpu()
-                .numpy()
-            )
-            grid_l0[order_index_block] = l0_loss
-
-            self._fit_point(label=1.0)
-            l1_loss = (
-                self.mlp.criterion(self.model(grid_X_block_T).squeeze(-1), loss_y1_t, reduction="none")
-                .detach()
-                .cpu()
-                .numpy()
-            )
-            grid_l1[order_index_block] = l1_loss
         return (
             grid_l0.reshape(self.n_ticks, self.n_ticks),
             grid_l1.reshape(self.n_ticks, self.n_ticks),
             initial_loss_0,
             initial_loss_1,
         )
+
+    def trace_point(self, X, batch_size: int = 500, n_iters: int = 40, weight: float = 1.0):
+        self._restore_og_model_state()
+        self.n_iters_ = n_iters
+        iters_p1 = n_iters + 1
+
+        self._create_batch(batch_size)
+        self.X_batch_t[-1, :] = torch.from_numpy(np.asarray(X)).to(dtype=torch.float32, device=self.device)
+
+        weight_t = torch.ones(batch_size + 1, device=self.device, dtype=torch.float32)
+        weight_t[-1] = weight
+        weight_t *= weight_t.nelement() / weight_t.sum()
+
+        mesh_X_grid_t = torch.from_numpy(self.mesh_X_grid).to(self.device, dtype=torch.float32)
+        loss_y0_t = torch.zeros(size=(self.n_grid_ticks,), dtype=torch.float32, device=self.device)
+        loss_y1_t = torch.ones(size=(self.n_grid_ticks,), dtype=torch.float32, device=self.device)
+
+        l0_loss_store = np.zeros((iters_p1, batch_size + 1), dtype=np.float32)
+        l1_loss_store = np.zeros_like(l0_loss_store)
+        grid_loss_l0 = np.zeros((iters_p1, self.n_grid_ticks), dtype=np.float32)
+        grid_loss_l1 = np.zeros_like(grid_loss_l0)
+
+        # -- Initial losses --
+        grid_loss_l0[0, :] = self.mlp.element_loss(mesh_X_grid_t, loss_y0_t).cpu().numpy()
+        grid_loss_l1[0, :] = self.mlp.element_loss(mesh_X_grid_t, loss_y1_t).cpu().numpy()
+        # loss over batch
+        self.y_batch_t[-1] = 0.0
+        l0_loss_store[0, :] = self.mlp.element_loss(self.X_batch_t, self.y_batch_t).cpu().numpy()
+        # loss over batch
+        self.y_batch_t[-1] = 1.0
+        l1_loss_store[0, :] = self.mlp.element_loss(self.X_batch_t, self.y_batch_t).cpu().numpy()
+
+        self._reset_store_state()
+
+        # iterate with label 0
+        self.y_batch_t[-1] = 0.0
+        for i in tqdm(range(1, n_iters + 1), total=n_iters):
+            self.mlp.weighted_train_epoch(self.X_batch_t, self.y_batch_t, weight_t)
+            l0_loss_store[i, :] = self.mlp.element_loss(self.X_batch_t, self.y_batch_t).cpu().numpy()
+            grid_loss_l0[i, :] = self.mlp.element_loss(mesh_X_grid_t, loss_y0_t).cpu().numpy()
+
+        # iterate with label 1
+        self.y_batch_t[-1] = 1.0
+        self.model.load_state_dict(self.model_state)
+        self.mlp.optimizer.load_state_dict(self.opt_state)
+        for i in tqdm(range(1, n_iters + 1), total=n_iters):
+            self.mlp.weighted_train_epoch(self.X_batch_t, self.y_batch_t, weight_t)
+            l1_loss_store[i, :] = self.mlp.element_loss(self.X_batch_t, self.y_batch_t).cpu().numpy()
+            grid_loss_l1[i, :] = self.mlp.element_loss(mesh_X_grid_t, loss_y1_t).cpu().numpy()
+        return grid_loss_l0, grid_loss_l1, l0_loss_store, l1_loss_store
