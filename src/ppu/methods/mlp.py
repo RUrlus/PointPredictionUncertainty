@@ -130,6 +130,19 @@ class MLP:
         self.criterion(self.model(X).squeeze(-1), y).backward()
         self.optimizer.step()
 
+    def weighted_train_epoch(self, X: torch.Tensor, y: torch.Tensor, w: torch.Tensor) -> None:
+        self.model.train()
+        self.optimizer.zero_grad()
+        # criterion -> loss; loss.backward
+        (self.criterion(self.model(X).squeeze(-1), y, reduction="none") * w).mean().backward()
+        self.optimizer.step()
+
+    def element_loss(self, X: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        return self.criterion(self.model(X).squeeze(-1), y, reduction="none").detach()
+
+    def weighted_element_loss(self, X: torch.Tensor, y: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+        return (self.criterion(self.model(X).squeeze(-1), y, reduction="none") * w).detach()
+
     def test(self, X: torch.Tensor, y: torch.Tensor, threshold: float = 0.5):
         self.model.eval()
         with torch.no_grad():
