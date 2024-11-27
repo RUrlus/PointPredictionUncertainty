@@ -156,7 +156,7 @@ class MLP:
             # Apply sigmoid to convert logits to probabilities
             return torch.sigmoid(self.model(X).squeeze(-1)).detach().cpu().numpy()
 
-    def score(self, X: NDArray | torch.Tensor, y: NDArray | torch.Tensor, threshold: float = 0.5) -> NDArray:
+    def label_score(self, X: NDArray | torch.Tensor, y: NDArray | torch.Tensor, threshold: float = 0.5) -> NDArray:
         X = self._arr_to_device(X, dtype=torch.float32)
         y = self._arr_to_device(y, dtype=torch.float32)
 
@@ -165,6 +165,11 @@ class MLP:
             # Apply sigmoid to convert logits to probabilities
             proba = torch.sigmoid(self.model(X).squeeze(-1)).detach()
         return torch.eq(torch.ge(proba, threshold), y).cpu().numpy().astype(int)
+
+    def score(self, xs, ys):
+        xs = torch.from_numpy(xs).to(dtype=torch.float32, device=self.device)
+        ys = torch.from_numpy(ys).to(dtype=torch.float32, device=self.device)
+        return self.test(xs, ys)
 
     def estimate_dropout_BI(self, X: NDArray | torch.Tensor, dropout=0.5, n_ens=10):
         X = self._arr_to_device(X)

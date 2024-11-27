@@ -92,6 +92,87 @@ def draw_beta_bs(classifier, generator, n_samples, bootstrap, n_models=64, thres
     return figure
 
 
+def draw_beta_class_sep(classifier, generator, n_samples, seps, n_models=64, threshold=0.5):
+    cbar_kws = {"use_gridspec": False, "location": "bottom"}
+    plt.rcParams.update({"font.size": 15})
+    n_fig = len(seps)
+    figure, axs = plt.subplots(3, n_fig, figsize=(3 * n_fig, 10.5))
+
+    figure.suptitle(f"Bootstrap = {n_models}")
+
+    i = 0
+    eps = 1
+    n_ticks = 100
+
+    for i in range(n_fig):
+        dataset = get_dataset(1000, generator, n_samples=n_samples, class_sep=seps[i])
+        ds = dataset
+
+        (X_train, y_train), (X_test, y_test) = ds  # X is the data point, y is the class label
+
+        with threadpool_limits(limits=4):
+            sep_model = get_models(classifier, generator, reps=n_models, n_samples=n_samples, class_sep=seps[i])
+
+        # the area we draw is a bit larger than the range of data points
+        x_min, x_max = X_train[:, 0].min() - eps, X_train[:, 0].max() + eps
+        y_min, y_max = X_train[:, 1].min() - eps, X_train[:, 1].max() + eps
+
+        cm_bright = ListedColormap(["#FF0000", "#0000FF"])  # color for data points
+        ax = axs[0][i]  # position of subgraph
+        ax.set_title(f"sep={seps[i]}")  # subgraph title
+        # Plot the training points
+        ax.scatter(X_train[:, 0], X_train[:, 1], c=y_train, cmap=cm_bright, edgecolors="k")
+        ax.set_xlim(x_min, x_max)  # axis range
+        ax.set_ylim(y_min, y_max)
+        ax.set_xticks(())
+        ax.set_yticks(())
+
+        x = np.linspace(x_min, x_max, n_ticks)
+        y = np.linspace(y_min, y_max, n_ticks)
+        xs, ys = np.meshgrid(x, y)
+        X_grid = np.c_[xs.ravel(), ys.ravel()]
+        response1 = get_Beta(X_grid, sep_model, threshold)
+        vmin = min(response1)
+        vmax = max(response1)
+        response1 = response1.reshape(xs.shape)
+
+        with threadpool_limits(limits=4):
+            response2 = get_Beta(
+                X_grid, bootstrap_models(classifier, generator, reps=n_models, n_samples=n_samples, class_sep=seps[i]), threshold
+            )
+        vmin = min(vmin, *response2)
+        vmax = max(vmax, *response2)
+        response2 = response2.reshape(xs.shape)
+
+        ax = axs[1][i]
+        # ax.set_title()
+        with np.errstate(all="ignore"):
+            sns.heatmap(response1, ax=ax, vmin=vmin, vmax=vmax, cbar_kws=cbar_kws).invert_yaxis()
+
+        ax.set_xticks(())
+        ax.set_yticks(())
+
+        ax = axs[2][i]
+
+        with np.errstate(all="ignore"):
+            sns.heatmap(response2, ax=ax, vmin=vmin, vmax=vmax, cbar_kws=cbar_kws).invert_yaxis()
+
+        ax.set_xticks(())
+        ax.set_yticks(())
+
+        i += 1
+
+    plt.subplots_adjust(  # left=0.1,
+        bottom=0.2,
+        # right=0.9,
+        top=0.9,
+        wspace=0.1,
+        hspace=0.5,
+    )
+
+    return figure
+
+
 def draw_beta_pdf(start, end, classifier, generator, n_samples, n_models=64, threshold=0.5, n_pdf=50):
     with threadpool_limits(limits=4):
         sep_model = get_models(classifier, generator, reps=n_models, n_samples=n_samples)

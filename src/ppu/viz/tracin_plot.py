@@ -4,7 +4,7 @@ import seaborn as sns
 from matplotlib.colors import ListedColormap
 from mpl_toolkits.mplot3d import Axes3D
 
-from ppu.methods.tracin import get_tracin
+from ppu.methods.tracin import get_random_resampled_tracin, get_random_tracin
 from ppu.methods.utils import get_dataset, get_models
 
 
@@ -18,7 +18,7 @@ def draw(data, x, y, mode="2d", ax=None, contour=False):
         ax.set_xticks(np.arange(0, data.shape[1]+1, 10))
         ax.set_yticks(np.arange(0, data.shape[0]+1, 10))
 
-        if contour is not False:
+        if contour is True:
             X, Y = np.meshgrid(np.arange(data.shape[1])+0.5, np.arange(data.shape[0])+0.5)
             ax.contour(X, Y, data, levels=[contour], colors="white", linewidths=1.5)
 
@@ -44,7 +44,7 @@ def draw(data, x, y, mode="2d", ax=None, contour=False):
     return ax
 
 
-def tracin_plot_iter(gen, n_samples, classifier, iters):
+def tracin_plot_iter(gen, n_samples, classifier, iters, ratio=0.25):
     figure, axs = plt.subplots(6, 2, figsize=(12,30))
 
 
@@ -81,11 +81,12 @@ def tracin_plot_iter(gen, n_samples, classifier, iters):
 
     for i in range(len(iters)):
 
+        tracin_0 = get_random_tracin(X_test=X_grid, y_test=0, X_train=X_train, y_train=y_train, mlp=nn, n_iter=iters[i], batch_size=int(n_samples*ratio))
+        tracin_1 = get_random_tracin(X_test=X_grid, y_test=1, X_train=X_train, y_train=y_train, mlp=nn, n_iter=iters[i], batch_size=int(n_samples*ratio))
 
 
-
-        loss0_1, loss0_2, tracin_0 = get_tracin(X_grid, 0., nn, train=(X_train, y_train), iter=iters[i], mode="random", num=500)
-        loss1_1, loss1_2, tracin_1 = get_tracin(X_grid, 1., nn, train=(X_train, y_train), iter=iters[i], mode="random", num=500)
+        #loss0_1, loss0_2, tracin_0 = get_tracin(X_grid, 0., nn, train=(X_train, y_train), iter=iters[i], mode="random", num=500)
+        #loss1_1, loss1_2, tracin_1 = get_tracin(X_grid, 1., nn, train=(X_train, y_train), iter=iters[i], mode="random", num=500)
         tracin = tracin_0 + tracin_1
 
         tracin_0 = tracin_0.reshape(xs.shape)
@@ -95,9 +96,11 @@ def tracin_plot_iter(gen, n_samples, classifier, iters):
         ax = axs[i+1][0]
         draw(tracin, x, y, ax=ax)
 
+        tracin_0 = get_random_resampled_tracin(X_test=X_grid, y_test=0, X_train=X_train, y_train=y_train, mlp=nn, n_iter=iters[i], batch_size=int(n_samples*ratio))
+        tracin_1 = get_random_resampled_tracin(X_test=X_grid, y_test=1, X_train=X_train, y_train=y_train, mlp=nn, n_iter=iters[i], batch_size=int(n_samples*ratio))
 
-        loss0_1, loss0_2, tracin_0 = get_tracin(X_grid, 0., nn, train=(X_train, y_train), iter=iters[i], mode="random", num=500, resample=True)
-        loss1_1, loss1_2, tracin_1 = get_tracin(X_grid, 1., nn, train=(X_train, y_train), iter=iters[i], mode="random", num=500, resample=True)
+        #loss0_1, loss0_2, tracin_0 = get_tracin(X_grid, 0., nn, train=(X_train, y_train), iter=iters[i], mode="random", num=500, resample=True)
+        #loss1_1, loss1_2, tracin_1 = get_tracin(X_grid, 1., nn, train=(X_train, y_train), iter=iters[i], mode="random", num=500, resample=True)
         tracin = tracin_0 + tracin_1
 
         tracin_0 = tracin_0.reshape(xs.shape)
@@ -110,9 +113,8 @@ def tracin_plot_iter(gen, n_samples, classifier, iters):
     return figure
 
 
-def tracin_plot_contour(gen, itrs, n_samples, classifier, resample=False, seed=0, eps=1.):
+def tracin_plot_contour(gen, itrs, n_samples, classifier, resample=False, ratio=0.25, seed=0, eps=1.):
     n_samples = 2000
-    resample = False
 
     figure, axs = plt.subplots(len(itrs), 3, figsize=(15, 4.5*len(itrs)))
 
@@ -135,8 +137,15 @@ def tracin_plot_contour(gen, itrs, n_samples, classifier, resample=False, seed=0
     for i in range(len(itrs)):
         itr = itrs[i]
 
-        loss0_1, loss0_2, tracin_0 = get_tracin(X_grid, 0., nn, train=(X_train, y_train), iter=itr, mode="random", num=int(n_samples/4), resample=resample)
-        loss1_1, loss1_2, tracin_1 = get_tracin(X_grid, 1., nn, train=(X_train, y_train), iter=itr, mode="random", num=int(n_samples/4), resample=resample)
+        if resample:
+            tracin_0 = get_random_resampled_tracin(X_test=X_grid, y_test=0, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+            tracin_1 = get_random_resampled_tracin(X_test=X_grid, y_test=1, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+        else:
+            tracin_0 = get_random_tracin(X_test=X_grid, y_test=0, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+            tracin_1 = get_random_tracin(X_test=X_grid, y_test=1, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+
+        #loss0_1, loss0_2, tracin_0 = get_tracin(X_grid, 0., nn, train=(X_train, y_train), iter=itr, mode="random", num=int(n_samples/4), resample=resample)
+        #loss1_1, loss1_2, tracin_1 = get_tracin(X_grid, 1., nn, train=(X_train, y_train), iter=itr, mode="random", num=int(n_samples/4), resample=resample)
         tracin = tracin_0 + tracin_1
 
         tracin_0 = tracin_0.reshape(xs.shape)
@@ -147,8 +156,15 @@ def tracin_plot_contour(gen, itrs, n_samples, classifier, resample=False, seed=0
         ax = axs[i][1]
         ax.hist(tracin, bins="auto", log=True)
 
-        losso_t_1, losso_t_2, tracino_t = get_tracin(X_train, 1., nn, train=(X_train, y_train), iter=itr, mode="random", num=int(n_samples/4), resample=resample)
-        lossi_t_1, lossi_t_2, tracini_t = get_tracin(X_train, 0., nn, train=(X_train, y_train), iter=itr, mode="random", num=int(n_samples/4), resample=resample)
+        if resample:
+            tracino_t = get_random_resampled_tracin(X_test=X_train, y_test=1, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+            tracini_t = get_random_resampled_tracin(X_test=X_train, y_test=0, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+        else:
+            tracino_t = get_random_tracin(X_test=X_train, y_test=1, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+            tracini_t = get_random_tracin(X_test=X_train, y_test=0, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+
+        #losso_t_1, losso_t_2, tracino_t = get_tracin(X_train, 1., nn, train=(X_train, y_train), iter=itr, mode="random", num=int(n_samples/4), resample=resample)
+        #lossi_t_1, lossi_t_2, tracini_t = get_tracin(X_train, 0., nn, train=(X_train, y_train), iter=itr, mode="random", num=int(n_samples/4), resample=resample)
         tracin_t = tracino_t + tracini_t
 
         ax = axs[i][2]
@@ -172,7 +188,7 @@ def tracin_plot_contour(gen, itrs, n_samples, classifier, resample=False, seed=0
     return figure
 
 
-def tracin_plot_single(gen, n_samples, classifier, itr, seed=0, resample=False):
+def tracin_plot_single(gen, n_samples, classifier, itr, seed=0, resample=False, ratio=0.25):
     data = get_dataset(seed, gen, n_samples=n_samples, class_sep=13.)
     nn  = get_models(classifier, gen, reps=1, n_samples=n_samples, seeds=[seed], class_sep=13.)[0]
 
@@ -189,12 +205,26 @@ def tracin_plot_single(gen, n_samples, classifier, itr, seed=0, resample=False):
     xs, ys = np.meshgrid(x, y)
     X_grid = np.c_[xs.ravel(), ys.ravel()]
 
-    loss0_1, loss0_2, tracin_0 = get_tracin(X_grid, 0., nn, train=(X_train, y_train), iter=itr, mode="random", num=500, resample=resample)
-    loss1_1, loss1_2, tracin_1 = get_tracin(X_grid, 1., nn, train=(X_train, y_train), iter=itr, mode="random", num=500, resample=resample)
+    if resample:
+        tracin_0 = get_random_resampled_tracin(X_test=X_grid, y_test=0, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+        tracin_1 = get_random_resampled_tracin(X_test=X_grid, y_test=1, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+    else:
+        tracin_0 = get_random_tracin(X_test=X_grid, y_test=0, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+        tracin_1 = get_random_tracin(X_test=X_grid, y_test=1, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+
+    #loss0_1, loss0_2, tracin_0 = get_tracin(X_grid, 0., nn, train=(X_train, y_train), iter=itr, mode="random", num=500, resample=resample)
+    #loss1_1, loss1_2, tracin_1 = get_tracin(X_grid, 1., nn, train=(X_train, y_train), iter=itr, mode="random", num=500, resample=resample)
     tracin = tracin_0 + tracin_1
 
-    losso_t_1, losso_t_2, tracino_t = get_tracin(X_train, 1., nn, train=(X_train, y_train), iter=itr, mode="random", num=500, resample=resample)
-    lossi_t_1, lossi_t_2, tracini_t = get_tracin(X_train, 0., nn, train=(X_train, y_train), iter=itr, mode="random", num=500, resample=resample)
+    if resample:
+        tracino_t = get_random_resampled_tracin(X_test=X_train, y_test=1, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+        tracini_t = get_random_resampled_tracin(X_test=X_train, y_test=0, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+    else:
+        tracino_t = get_random_tracin(X_test=X_train, y_test=1, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+        tracini_t = get_random_tracin(X_test=X_train, y_test=0, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+
+    #losso_t_1, losso_t_2, tracino_t = get_tracin(X_train, 1., nn, train=(X_train, y_train), iter=itr, mode="random", num=500, resample=resample)
+    #lossi_t_1, lossi_t_2, tracini_t = get_tracin(X_train, 0., nn, train=(X_train, y_train), iter=itr, mode="random", num=500, resample=resample)
     tracin_t = tracino_t + tracini_t
 
     tracin_0 = tracin_0.reshape(xs.shape)
@@ -236,8 +266,7 @@ def tracin_plot_single(gen, n_samples, classifier, itr, seed=0, resample=False):
     return figure
 
 
-def tracin_plot_seeds(gen, n_samples, classifier, seeds, itr=3):
-    mode = "2d"
+def tracin_plot_seeds(gen, n_samples, classifier, seeds, itr=3, ratio=0.25, mode = "2d"):
     if mode == "3d":
         figure, axs = plt.subplots(len(seeds), 3, figsize=(15, 4.5*len(seeds)), subplot_kw = {"projection": "3d"})
     elif mode == "2d":
@@ -276,8 +305,11 @@ def tracin_plot_seeds(gen, n_samples, classifier, seeds, itr=3):
         ax.set_ylim(y_min, y_max)
 
 
-        loss0_1, loss0_2, tracin_0 = get_tracin(X_grid, 0., nn, train=(X_train, y_train), iter=itr, mode="random", num=500)
-        loss1_1, loss1_2, tracin_1 = get_tracin(X_grid, 1., nn, train=(X_train, y_train), iter=itr, mode="random", num=500)
+        #loss0_1, loss0_2, tracin_0 = get_tracin(X_grid, 0., nn, train=(X_train, y_train), iter=itr, mode="random", num=500)
+        #loss1_1, loss1_2, tracin_1 = get_tracin(X_grid, 1., nn, train=(X_train, y_train), iter=itr, mode="random", num=500)
+
+        tracin_0 = get_random_tracin(X_test=X_grid, y_test=0, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+        tracin_1 = get_random_tracin(X_test=X_grid, y_test=1, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
         tracin = tracin_0 + tracin_1
 
         tracin_0 = tracin_0.reshape(xs.shape)
@@ -288,8 +320,10 @@ def tracin_plot_seeds(gen, n_samples, classifier, seeds, itr=3):
         draw(tracin, x, y, mode=mode, ax=ax)
 
 
-        loss0_1, loss0_2, tracin_0 = get_tracin(X_grid, 0., nn, train=(X_train, y_train), iter=itr, mode="random", num=500, resample=True)
-        loss1_1, loss1_2, tracin_1 = get_tracin(X_grid, 1., nn, train=(X_train, y_train), iter=itr, mode="random", num=500, resample=True)
+        #loss0_1, loss0_2, tracin_0 = get_tracin(X_grid, 0., nn, train=(X_train, y_train), iter=itr, mode="random", num=500, resample=True)
+        #loss1_1, loss1_2, tracin_1 = get_tracin(X_grid, 1., nn, train=(X_train, y_train), iter=itr, mode="random", num=500, resample=True)
+        tracin_0 = get_random_resampled_tracin(X_test=X_grid, y_test=0, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
+        tracin_1 = get_random_resampled_tracin(X_test=X_grid, y_test=1, X_train=X_train, y_train=y_train, mlp=nn, n_iter=itr, batch_size=int(n_samples*ratio))
         tracin = tracin_0 + tracin_1
 
         tracin_0 = tracin_0.reshape(xs.shape)

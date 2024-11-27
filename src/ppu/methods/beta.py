@@ -17,7 +17,19 @@ def beta_para(lables, prior_a=0.5, prior_b=0.5):
     return alpha, beta
 
 
-def get_Beta(xs, models, threshold, prior_a=0.5, prior_b=0.5):
+def dirichlet_mean(labels, prior):
+    classes = np.array(list(range(len(prior))))
+    counts = np.zeros(len(classes), dtype=int)
+
+    for i, cls in enumerate(classes):
+        counts[i] = np.sum(labels == cls)
+
+    post = prior + counts
+    return 1 - post.max() / post.sum()
+
+
+
+def get_Beta(xs, models, threshold=0.5, prior_a=0.5, prior_b=0.5):
     preds = np.array([_check_boundary_response_method(m, "auto")(xs) for m in models])
     # preds are probabilities
     if len(preds.shape) == 3:
@@ -39,3 +51,12 @@ def get_Beta_para(start, end, models, threshold, prior_a=0.5, prior_b=0.5, num_p
 
     labels = np.where(preds >= threshold, 1, 0)
     return np.array([beta_para(label, prior_a, prior_b) for label in labels.T])
+
+
+def get_dirichlet(xs, models, prior):
+    preds = np.array([_check_boundary_response_method(m, "auto")(xs) for m in models])
+    # preds are probabilities
+
+    labels = np.argmax(preds, axis=2)
+
+    return np.array([beta_mean(label, prior) for label in labels.T])
