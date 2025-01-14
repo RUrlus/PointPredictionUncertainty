@@ -166,6 +166,10 @@ def get_random_tracin(
     rng = rng or np.random.Generator(np.random.PCG64DXSM())
     n_points, ncols = X_test.shape
     x_rows, x_cols = X_train.shape
+    if isinstance(y_test, (int, float)) or len(y_test.shape) == 1:
+        y_cols = 1 
+    else:
+        y_rows, y_cols = y_test.shape
 
     mlp = copy.deepcopy(mlp)
     mlp.model.to("cpu")
@@ -192,7 +196,10 @@ def get_random_tracin(
     ridx = rng.choice(x_idx, size=batch_size, replace=False)
     x_batch = torch.empty((batch_size + 1, x_cols), device=mlp.device, dtype=torch.float32)
     x_batch[:batch_size] = X_train[ridx]
-    y_batch = torch.empty(batch_size + 1, device=mlp.device, dtype=torch.float32)
+    if len(y_train.shape) == 1:
+        y_batch = torch.empty(batch_size + 1, device=mlp.device, dtype=torch.float32)
+    else:
+        y_batch = torch.empty((batch_size + 1, y_cols), device=mlp.device, dtype=torch.float32)
     y_batch[:batch_size] = y_train[ridx]
 
     tracin = np.empty((n_points, n_iter), dtype=float)

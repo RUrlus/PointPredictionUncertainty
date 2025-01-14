@@ -67,11 +67,12 @@ class MLP:
             return (x if isinstance(x, torch.Tensor) else torch.from_numpy(x)).to(dtype=dtype, device=self.device)
         return (x if isinstance(x, torch.Tensor) else torch.from_numpy(x)).to(device=self.device)
 
-    def _pred_from_single(self, outputs) -> torch.Tensor:
+    def _pred_from_single(self, outputs, y) -> torch.Tensor:
         return torch.gt(outputs.data, 0).squeeze(-1)
 
-    def _pred_from_mutli(self, outputs) -> torch.Tensor:
-        return outputs.data.argmax(-1)
+    def _pred_from_mutli(self, outputs, y) -> torch.Tensor:
+        num_classes = y.shape[1]
+        return F.one_hot(outputs.data.argmax(-1).to(torch.int64), num_classes=num_classes)
 
     def fit(self, X: NDArray | torch.Tensor, y: NDArray | torch.Tensor, n_iter: int | None = None):
         X = X if isinstance(X, torch.Tensor) else torch.from_numpy(X)
@@ -146,8 +147,12 @@ class MLP:
     def test(self, X: torch.Tensor, y: torch.Tensor, threshold: float = 0.5):
         self.model.eval()
         with torch.no_grad():
-            pred = self._pred_from_output(self.model(X))
-        return torch.sum(torch.eq(pred, y)) / y.shape[0]
+            pred = self._pred_from_output(self.model(X), y)
+        if y.ndim == 1:
+            return torch.sum(torch.eq(pred, y)) / y.shape[0]
+        if y.ndim == 2:
+            return torch.sum(torch.all(torch.eq(pred, y), dim=1)) / y.shape[0]
+        return None
 
     def predict_proba(self, X: NDArray | torch.Tensor) -> NDArray:
         X = self._arr_to_device(X, dtype=torch.float32)
